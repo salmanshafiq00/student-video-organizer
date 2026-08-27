@@ -6,6 +6,7 @@ import type { Playlist, Video, VideoWithState } from "@/types";
 
 interface LibraryData {
   loading: boolean;
+  error: string | null;
   playlists: Playlist[];
   videos: VideoWithState[];
   refresh: () => Promise<void>;
@@ -20,29 +21,36 @@ interface LibraryData {
  */
 export function useVideoLibrary(uid: string | undefined): LibraryData {
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
   const [playlists, setPlaylists] = React.useState<Playlist[]>([]);
   const [videos, setVideos] = React.useState<VideoWithState[]>([]);
 
   const load = React.useCallback(async () => {
-    if (!uid) return;
-    setLoading(true);
-    const [pls, states] = await Promise.all([listPlaylists(false), getAllUserVideoStates(uid)]);
-    setPlaylists(pls);
-    const allVideos: VideoWithState[] = [];
-    // Small student group / small library assumption: fetching each
-    // playlist's videos is fine at this scale and keeps documents small
-    // (one doc per video) rather than one giant array field.
-    for (const p of pls) {
-      const vids = await listVideos(p.id);
-      vids.forEach((v) => allVideos.push({ ...v, state: states[v.id] || null, playlistTitle: p.title }));
+    if (!uid) {
+      setLoading(false);
+      setError(null);
+      return;
     }
-    setVideos(allVideos);
-    setLoading(false);
+    setLoading(true);
+    setError(null);
+    try {
+      const [pls, states] = await Promise.all([listPlaylists(false), getAllUserVideoStates(uid)]);
+      const videosByPlaylist = await Promise.all(pls.map(async (p) => {
+        const vids = await listVideos(p.id);
+        return vids.map((v) => ({ ...v, state: states[v.id] || null, playlistTitle: p.title }));
+      }));
+      setPlaylists(pls);
+      setVideos(videosByPlaylist.flat());
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The learning library could not be loaded.");
+    } finally {
+      setLoading(false);
+    }
   }, [uid]);
 
   React.useEffect(() => {
     load();
   }, [load]);
 
-  return { loading, playlists, videos, refresh: load };
+  return { loading, error, playlists, videos, refresh: load };
 }

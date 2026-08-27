@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { bulkAddVideos, createPlaylist, listPlaylists } from "@/lib/firestore/playlists";
-import { extractYouTubeId, youtubeThumbnail } from "@/lib/utils";
+import { detectVideoPlatform, extractYouTubeId, youtubeThumbnail } from "@/lib/utils";
 import type { Playlist } from "@/types";
 import { toast } from "sonner";
 import { FileJson, Upload } from "lucide-react";
@@ -77,7 +77,7 @@ function AdminImportJsonContent() {
         const ytId = extractYouTubeId(url);
         const thumb = r["Thumbnail URL"] || r.thumbnailUrl || (ytId ? youtubeThumbnail(ytId) : "");
         return {
-          title: r.Title || r.title || "Untitled",
+          title: String(r.Title || r.title || "").trim(),
           videoUrl: url,
           thumbnailUrl: thumb,
           youtubeVideoId: ytId,
@@ -98,6 +98,17 @@ function AdminImportJsonContent() {
 
   async function handleImport() {
     if (!user || rows.length === 0) return;
+    const invalidRows = rows.filter((row) => {
+      try {
+        return !row.title.trim() || new URL(row.videoUrl).protocol !== "https:";
+      } catch {
+        return true;
+      }
+    });
+    if (invalidRows.length > 0) {
+      toast.error(`${invalidRows.length} row(s) need a title and valid HTTPS URL before importing.`);
+      return;
+    }
     setImporting(true);
     try {
       let playlistId = targetPlaylistId;
@@ -108,6 +119,7 @@ function AdminImportJsonContent() {
       await bulkAddVideos(playlistId, rows.map((r) => ({
         title: r.title,
         videoUrl: r.videoUrl,
+        platform: detectVideoPlatform(r.videoUrl),
         youtubeVideoId: r.youtubeVideoId,
         thumbnailUrl: r.thumbnailUrl,
         videoNo: r.videoNo,
@@ -165,6 +177,7 @@ function AdminImportJsonContent() {
                     <span className="w-6 shrink-0 text-center font-mono text-xs text-muted-foreground">{i + 1}</span>
                     <span className="min-w-0 flex-1 truncate">{r.title}</span>
                     {r.lessonNo != null && <Badge variant="outline">Lesson {r.lessonNo}</Badge>}
+                    {!r.title && <Badge variant="destructive">Missing title</Badge>}
                     {!r.videoUrl && <Badge variant="destructive">Missing URL</Badge>}
                   </div>
                 ))}

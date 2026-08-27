@@ -27,11 +27,6 @@ interface AuthContextValue {
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
-const SEED_ADMIN_EMAILS = (process.env.NEXT_PUBLIC_SEED_ADMIN_EMAILS || "")
-  .split(",")
-  .map((e) => e.trim().toLowerCase())
-  .filter(Boolean);
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<User | null>(null);
   const [profile, setProfile] = React.useState<UserProfile | null>(null);
@@ -48,14 +43,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const ref = doc(db, "users", fbUser.uid);
       const snap = await getDoc(ref);
       if (!snap.exists()) {
-        // First sign-in: create the profile document. Role is 'admin' only
-        // if the email is in the seed list; otherwise 'student'. Real admin
-        // promotion afterwards happens via Firestore (admin-only write).
-        const role = SEED_ADMIN_EMAILS.includes((fbUser.email || "").toLowerCase()) ? "admin" : "student";
+        // Client-created profiles are always students. Promote the first
+        // administrator out of band, then use the admin UI for later changes.
         const newProfile: Omit<UserProfile, "uid"> = {
           email: fbUser.email || "",
           displayName: fbUser.displayName || fbUser.email?.split("@")[0] || "Student",
-          role,
+          role: "student",
           status: "active",
           createdAt: serverTimestamp() as any,
           lastActiveAt: serverTimestamp() as any,

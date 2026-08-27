@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { VideoListRow } from "@/components/video/VideoListRow";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { getUserProfile, recomputeUserStats, setUserStatus } from "@/lib/firestore/users";
+import { getUserProfile, recomputeUserStats, setUserRole, setUserStatus } from "@/lib/firestore/users";
 import { listPlaylists, listVideos } from "@/lib/firestore/playlists";
 import { listPersonalPlaylists } from "@/lib/firestore/personalPlaylists";
 import {
@@ -87,6 +87,14 @@ function AdminUserDetailContent() {
     toast.success(next === "active" ? "Access re-enabled" : "Access disabled");
   }
 
+  async function handleToggleRole() {
+    if (!profile) return;
+    const next = profile.role === "admin" ? "student" : "admin";
+    await setUserRole(profile.uid, next);
+    setProfile({ ...profile, role: next });
+    toast.success(next === "admin" ? "User promoted to admin" : "Admin role removed");
+  }
+
   async function handleRefreshStats() {
     if (!profile) return;
     const stats = await recomputeUserStats(profile.uid);
@@ -126,9 +134,13 @@ function AdminUserDetailContent() {
               <p className="text-sm text-muted-foreground">{profile.email}</p>
             </div>
             <Badge variant={profile.status === "active" ? "success" : "destructive"}>{profile.status}</Badge>
+            <Badge variant="outline">{profile.role}</Badge>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleRefreshStats}>Refresh stats</Button>
+            <Button variant="outline" size="sm" onClick={handleToggleRole}>
+              {profile.role === "admin" ? "Remove admin" : "Make admin"}
+            </Button>
             <Button variant={profile.status === "active" ? "destructive" : "default"} size="sm" onClick={handleToggleStatus}>
               {profile.status === "active" ? <><ShieldOff className="h-4 w-4" /> Disable access</> : <><ShieldCheckIcon className="h-4 w-4" /> Enable access</>}
             </Button>
@@ -284,7 +296,7 @@ function AdminUserDetailContent() {
               <Textarea value={noteContent} readOnly className="min-h-[100px]" />
             </div>
             <p className="text-xs text-muted-foreground">
-              Read-only preview. Editing a student's notes directly is supported via the same Firestore
+              Read-only preview. Editing a student&apos;s notes directly is supported via the same Firestore
               document (users/{"{"}uid{"}"}/notes/{"{"}videoId{"}"}) — wire up a save button here if your workflow needs it.
             </p>
           </div>

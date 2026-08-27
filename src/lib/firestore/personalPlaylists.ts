@@ -3,7 +3,7 @@ import {
   orderBy, query, serverTimestamp, updateDoc, writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { PersonalPlaylist, PersonalVideo, PriorityLevel, WatchStatus } from "@/types";
+import type { PersonalPlaylist, PersonalVideo, PriorityLevel, VideoPlatform, WatchStatus } from "@/types";
 
 /**
  * Personal playlists live under users/{ownerId}/personalPlaylists/{id} —
@@ -61,10 +61,20 @@ export async function getPersonalVideo(ownerId: string, playlistId: string, vide
 export async function addPersonalVideo(
   ownerId: string,
   playlistId: string,
-  data: { title: string; videoUrl: string; youtubeVideoId?: string | null; thumbnailUrl: string; durationSeconds?: number }
+  data: {
+    title: string;
+    videoUrl: string;
+    platform?: VideoPlatform;
+    youtubeVideoId?: string | null;
+    thumbnailUrl: string;
+    durationSeconds?: number;
+    creatorName?: string;
+  }
 ): Promise<string> {
   const existing = await getDocs(videosCol(ownerId, playlistId));
-  const ref = await addDoc(videosCol(ownerId, playlistId), {
+  const ref = doc(videosCol(ownerId, playlistId));
+  const batch = writeBatch(db);
+  batch.set(ref, {
     ...data,
     order: existing.size,
     status: "not_started" as WatchStatus,
@@ -78,9 +88,10 @@ export async function addPersonalVideo(
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  await updateDoc(doc(db, "users", ownerId, "personalPlaylists", playlistId), {
+  batch.update(doc(db, "users", ownerId, "personalPlaylists", playlistId), {
     videoCount: increment(1), updatedAt: serverTimestamp(),
   });
+  await batch.commit();
   return ref.id;
 }
 
@@ -94,10 +105,12 @@ export async function updatePersonalVideoMeta(
 }
 
 export async function removePersonalVideo(ownerId: string, playlistId: string, videoId: string) {
-  await deleteDoc(doc(db, "users", ownerId, "personalPlaylists", playlistId, "videos", videoId));
-  await updateDoc(doc(db, "users", ownerId, "personalPlaylists", playlistId), {
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "users", ownerId, "personalPlaylists", playlistId, "videos", videoId));
+  batch.update(doc(db, "users", ownerId, "personalPlaylists", playlistId), {
     videoCount: increment(-1), updatedAt: serverTimestamp(),
   });
+  await batch.commit();
 }
 
 export async function reorderPersonalVideos(ownerId: string, playlistId: string, orderedVideoIds: string[]) {

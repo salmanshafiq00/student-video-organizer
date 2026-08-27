@@ -63,7 +63,7 @@ function PriorityContent() {
       <div className="mx-auto max-w-3xl space-y-8">
         <div>
           <h1 className="font-display text-2xl font-semibold">Priority</h1>
-          <p className="text-sm text-muted-foreground">Videos you've marked important, ordered High → Medium → Low.</p>
+          <p className="text-sm text-muted-foreground">Videos you&apos;ve marked important, ordered High → Medium → Low.</p>
         </div>
 
         {loading ? (

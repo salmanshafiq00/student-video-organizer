@@ -11,7 +11,9 @@ export async function listGoals(uid: string): Promise<Goal[]> {
 }
 
 export async function addGoal(uid: string, title: string, targetDate?: string) {
-  await addDoc(goalsCol(uid), { title, targetDate: targetDate || null, completed: false, createdAt: serverTimestamp() });
+  await addDoc(goalsCol(uid), {
+    title: title.trim(), targetDate: targetDate || null, completed: false, createdAt: serverTimestamp(),
+  });
 }
 
 export async function toggleGoal(uid: string, goalId: string, completed: boolean) {

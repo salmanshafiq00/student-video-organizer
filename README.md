@@ -123,13 +123,9 @@ read/write quota.
    ```
 5. Project settings → General → "Your apps" → add a **Web app** → copy the
    config values into `.env.local` (see `.env.local.example`).
-6. Set `NEXT_PUBLIC_SEED_ADMIN_EMAILS` in `.env.local` to your own email
-   (comma-separated for multiple admins). The **first time** that email signs
-   up, its Firestore profile is created with `role: "admin"` automatically.
-   Anyone else who signs up becomes a `student`. You can promote/demote users
-   later by editing their `users/{uid}.role` field directly in the Firebase
-   console, or by having an existing admin do it from a future "manage roles"
-   action (the Firestore rules already allow admin-only role writes).
+6. Register the first account, then promote its `users/{uid}.role` field to
+  `"admin"` in the Firebase console. New accounts always start as `student`
+  accounts; role management can be added to the admin tools later.
 
 ### Optional: YouTube playlist import
 
@@ -149,24 +145,24 @@ cp .env.local.example .env.local   # fill in your Firebase config
 npm run dev
 ```
 
-Visit `http://localhost:3000`, register an account with your seed-admin
-email, and you'll land in the Admin Dashboard. Students can use **Playlists →
+Visit `http://localhost:3000`, register an account, and promote the first
+profile to admin as described above. Students can use **Playlists →
 New Playlist** to create private content. Admins can use **Admin → Playlists**
 (or **Import JSON** / **Import YouTube Playlist**) to manage any user's content.
 
-## 8. Deploying to Netlify (free tier)
+## 8. Deploying to Vercel
 
-1. Push this repo to GitHub/GitLab/Bitbucket.
-2. In Netlify: **Add new site → Import an existing project**, pick the repo.
-3. Netlify auto-detects Next.js via `netlify.toml` (uses
-   `@netlify/plugin-nextjs`, installed automatically). Build command
-   `npm run build`, publish directory `.next` — already set in `netlify.toml`.
-4. Add the same environment variables from `.env.local` in
-   **Site settings → Environment variables** (including `YOUTUBE_API_KEY` if
-   you want that feature, and `NEXT_PUBLIC_SEED_ADMIN_EMAILS`).
-5. Deploy. Netlify's free tier comfortably covers a small student-group app
-   like this (the YouTube-import API route runs as a Netlify Function under
-   the hood, within the free invocation limits).
+1. Import this GitHub repository into Vercel and configure the six
+  `NEXT_PUBLIC_FIREBASE_*` variables from `.env.local`.
+2. Add `YOUTUBE_API_KEY` in Vercel only if YouTube playlist import is needed.
+3. In GitHub repository settings, add these Actions secrets:
+  `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`,
+  `FIREBASE_PROJECT_ID`, and `FIREBASE_SERVICE_ACCOUNT`.
+4. The workflow in `.github/workflows/ci-cd.yml` runs typecheck, lint, rules
+  tests, and a production build on pull requests and pushes. A push to
+  `main` then deploys Firestore rules/indexes and the Vercel artifact.
+5. Create the first admin as described above. Keep Firebase client variables
+  public, but never commit `YOUTUBE_API_KEY` or the service-account JSON.
 
 ---
 

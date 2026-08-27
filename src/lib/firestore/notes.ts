@@ -8,7 +8,9 @@ export async function getNote(uid: string, videoId: string): Promise<VideoNote |
 }
 
 export async function saveNote(uid: string, videoId: string, content: string) {
-  await setDoc(doc(db, "users", uid, "notes", videoId), { videoId, content, updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(doc(db, "users", uid, "notes", videoId), {
+    videoId, content: content.trim(), updatedAt: serverTimestamp(),
+  }, { merge: true });
 }
 
 export async function getSummary(uid: string, videoId: string): Promise<VideoSummary | null> {
@@ -17,5 +19,7 @@ export async function getSummary(uid: string, videoId: string): Promise<VideoSum
 }
 
 export async function saveSummary(uid: string, videoId: string, content: string) {
-  await setDoc(doc(db, "users", uid, "summaries", videoId), { videoId, content, updatedAt: serverTimestamp() }, { merge: true });
+  await setDoc(doc(db, "users", uid, "summaries", videoId), {
+    videoId, content: content.trim(), updatedAt: serverTimestamp(),
+  }, { merge: true });
 }

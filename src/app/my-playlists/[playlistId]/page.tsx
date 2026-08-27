@@ -22,7 +22,7 @@ import {
   listPersonalVideos, removePersonalVideo, reorderPersonalVideos,
   renamePersonalPlaylist, updatePersonalVideoMeta,
 } from "@/lib/firestore/personalPlaylists";
-import { extractYouTubeId, formatDuration, youtubeThumbnail } from "@/lib/utils";
+import { detectVideoPlatform, extractYouTubeId, formatDuration, youtubeThumbnail } from "@/lib/utils";
 import type { PersonalPlaylist, PersonalVideo } from "@/types";
 import { ArrowLeft, GripVertical, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -39,7 +39,7 @@ function PersonalPlaylistEditorContent() {
   const { playlistId } = useParams<{ playlistId: string }>();
   const searchParams = useSearchParams();
   const { user, isAdmin } = useAuth();
-  const ownerId = searchParams.get("owner") || user?.uid || "";
+  const ownerId = (isAdmin ? searchParams.get("owner") : null) || user?.uid || "";
   const isViewingOther = ownerId !== user?.uid;
 
   const [playlist, setPlaylist] = React.useState<PersonalPlaylist | null>(null);
@@ -85,6 +85,7 @@ function PersonalPlaylistEditorContent() {
     await addPersonalVideo(ownerId, playlistId, {
       title: newTitle.trim(),
       videoUrl: newUrl.trim(),
+      platform: detectVideoPlatform(newUrl),
       youtubeVideoId: ytId,
       thumbnailUrl: newThumb.trim() || (ytId ? youtubeThumbnail(ytId) : ""),
     });

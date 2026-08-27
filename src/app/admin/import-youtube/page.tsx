@@ -70,7 +70,8 @@ function AdminImportYouTubeContent() {
         playlistId = await createPlaylist({ title: newPlaylistTitle.trim(), source: "youtube-import", sourceUrl: url }, user.uid);
       }
       await bulkAddVideos(playlistId, videos.map((v) => ({
-        title: v.title, videoUrl: v.videoUrl, youtubeVideoId: v.youtubeVideoId, thumbnailUrl: v.thumbnailUrl,
+        title: v.title, videoUrl: v.videoUrl, platform: "youtube" as const,
+        youtubeVideoId: v.youtubeVideoId, thumbnailUrl: v.thumbnailUrl,
       })));
       toast.success(`Imported ${videos.length} videos`);
       setVideos([]);
@@ -89,7 +90,7 @@ function AdminImportYouTubeContent() {
         <div>
           <h1 className="font-display text-2xl font-semibold">Import YouTube Playlist</h1>
           <p className="text-sm text-muted-foreground">
-            Order and metadata are pulled from YouTube's public API. Nothing is downloaded — only URLs and thumbnail links are stored.
+            Order and metadata are pulled from YouTube&apos;s public API. Nothing is downloaded — only URLs and thumbnail links are stored.
           </p>
         </div>
 

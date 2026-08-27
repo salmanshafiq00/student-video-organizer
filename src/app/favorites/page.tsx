@@ -25,7 +25,7 @@ function FavoritesContent() {
       <div className="mx-auto max-w-7xl space-y-4">
         <div>
           <h1 className="font-display text-2xl font-semibold">Favorites</h1>
-          <p className="text-sm text-muted-foreground">Videos you've marked as favorites — independent of priority or watch later.</p>
+          <p className="text-sm text-muted-foreground">Videos you&apos;ve marked as favorites — independent of priority or watch later.</p>
         </div>
         <VideoGrid
           videos={favorites}

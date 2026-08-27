@@ -36,9 +36,16 @@ export async function getUserVideoState(uid: string, videoId: string): Promise<U
 }
 
 async function upsert(uid: string, videoId: string, playlistId: string, patch: Partial<UserVideoState>) {
+  const existing = await getDoc(stateDoc(uid, videoId));
   await setDoc(
     stateDoc(uid, videoId),
-    { videoId, playlistId, ...patch, updatedAt: serverTimestamp() },
+    {
+      ...(existing.exists() ? {} : emptyState(videoId, playlistId)),
+      videoId,
+      playlistId,
+      ...patch,
+      updatedAt: serverTimestamp(),
+    },
     { merge: true }
   );
 }
@@ -51,14 +58,15 @@ export async function saveProgress(
   currentPositionSeconds: number,
   watchedPercentage: number
 ) {
-  const status: WatchStatus = watchedPercentage >= 95 ? "completed" : watchedPercentage > 0 ? "in_progress" : "not_started";
+  const safePercentage = Math.min(100, Math.max(0, Math.round(watchedPercentage)));
+  const status: WatchStatus = safePercentage >= 95 ? "completed" : safePercentage > 0 ? "in_progress" : "not_started";
   const patch: Partial<UserVideoState> = {
-    currentPositionSeconds,
-    watchedPercentage: Math.min(100, Math.round(watchedPercentage)),
+    currentPositionSeconds: Math.max(0, currentPositionSeconds),
+    watchedPercentage: safePercentage,
     status,
     lastWatchedAt: serverTimestamp() as any,
+    completedAt: status === "completed" ? (serverTimestamp() as any) : null,
   };
-  if (status === "completed") patch.completedAt = serverTimestamp() as any;
   await upsert(uid, videoId, playlistId, patch);
 }
 

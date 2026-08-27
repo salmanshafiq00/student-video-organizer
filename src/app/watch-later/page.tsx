@@ -64,7 +64,7 @@ function WatchLaterContent() {
       <div className="mx-auto max-w-3xl space-y-4">
         <div>
           <h1 className="font-display text-2xl font-semibold">Watch Later</h1>
-          <p className="text-sm text-muted-foreground">Videos you've saved to come back to. Drag to reorder.</p>
+          <p className="text-sm text-muted-foreground">Videos you&apos;ve saved to come back to. Drag to reorder.</p>
         </div>
 
         {loading ? (
@@ -73,7 +73,7 @@ function WatchLaterContent() {
           </div>
         ) : order.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
-            Nothing saved yet — tap "Watch Later" on any video to add it here.
+            Nothing saved yet — tap &quot;Watch Later&quot; on any video to add it here.
           </p>
         ) : (
           <SortableList

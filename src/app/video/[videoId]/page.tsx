@@ -205,7 +205,7 @@ function VideoPageContent() {
               placeholder="Take notes while you watch…"
               className="min-h-[140px]"
             />
-            <p className="mt-1 text-xs text-muted-foreground">Private to you — other students can't see this.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Private to you — other students can&apos;t see this.</p>
           </TabsContent>
 
           <TabsContent value="bookmarks" className="space-y-3">

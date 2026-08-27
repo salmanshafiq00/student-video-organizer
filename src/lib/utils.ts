@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { VideoPlatform } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -32,6 +33,18 @@ export function extractYouTubeId(url: string): string | null {
   } catch {
     return null;
   }
+}
+
+export function detectVideoPlatform(value: string): VideoPlatform {
+  try {
+    const hostname = new URL(value).hostname.toLowerCase().replace(/^www\./, "");
+    if (hostname === "youtube.com" || hostname.endsWith(".youtube.com") || hostname === "youtu.be") return "youtube";
+    if (hostname === "facebook.com" || hostname.endsWith(".facebook.com") || hostname === "fb.watch") return "facebook";
+    if (hostname === "vimeo.com" || hostname.endsWith(".vimeo.com")) return "vimeo";
+  } catch {
+    // Invalid URLs are handled by the metadata endpoint and Firestore rules.
+  }
+  return "other";
 }
 
 export function extractYouTubePlaylistId(url: string): string | null {

@@ -30,12 +30,12 @@ export default function MyPlaylistsPage() {
 }
 
 function MyPlaylistsContent() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const searchParams = useSearchParams();
   // Admins can pass ?owner=<uid> to browse/manage a specific student's
   // personal playlists from the Admin > User detail page. Otherwise this is
   // always "my own" playlists.
-  const ownerId = searchParams.get("owner") || user?.uid || "";
+  const ownerId = (isAdmin ? searchParams.get("owner") : null) || user?.uid || "";
 
   const [playlists, setPlaylists] = React.useState<PersonalPlaylist[]>([]);
   const [loading, setLoading] = React.useState(true);

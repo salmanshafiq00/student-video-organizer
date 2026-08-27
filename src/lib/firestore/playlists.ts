@@ -76,13 +76,16 @@ export async function addVideo(
 ): Promise<string> {
   const existing = await getDocs(videosCol(playlistId));
   const order = existing.size;
-  const ref = await addDoc(videosCol(playlistId), {
+  const ref = doc(videosCol(playlistId));
+  const batch = writeBatch(db);
+  batch.set(ref, {
     ...data,
     order,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  await updateDoc(doc(db, "playlists", playlistId), { videoCount: increment(1), updatedAt: serverTimestamp() });
+  batch.update(doc(db, "playlists", playlistId), { videoCount: increment(1), updatedAt: serverTimestamp() });
+  await batch.commit();
   return ref.id;
 }
 
@@ -91,8 +94,10 @@ export async function updateVideo(playlistId: string, videoId: string, data: Par
 }
 
 export async function removeVideo(playlistId: string, videoId: string) {
-  await deleteDoc(doc(db, "playlists", playlistId, "videos", videoId));
-  await updateDoc(doc(db, "playlists", playlistId), { videoCount: increment(-1), updatedAt: serverTimestamp() });
+  const batch = writeBatch(db);
+  batch.delete(doc(db, "playlists", playlistId, "videos", videoId));
+  batch.update(doc(db, "playlists", playlistId), { videoCount: increment(-1), updatedAt: serverTimestamp() });
+  await batch.commit();
 }
 
 /** Persist a new video order after drag & drop. Uses one batched write. */

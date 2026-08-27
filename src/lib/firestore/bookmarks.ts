@@ -11,7 +11,12 @@ export async function listBookmarks(uid: string, videoId: string): Promise<Bookm
 }
 
 export async function addBookmark(uid: string, videoId: string, timestampSeconds: number, label: string) {
-  await addDoc(bookmarksCol(uid, videoId), { videoId, timestampSeconds, label, createdAt: serverTimestamp() });
+  await addDoc(bookmarksCol(uid, videoId), {
+    videoId,
+    timestampSeconds: Math.max(0, timestampSeconds),
+    label: label.trim(),
+    createdAt: serverTimestamp(),
+  });
 }
 
 export async function removeBookmark(uid: string, videoId: string, bookmarkId: string) {

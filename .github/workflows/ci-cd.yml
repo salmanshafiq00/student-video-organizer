@@ -1,0 +1,94 @@
+name: CI/CD
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality and security checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Use Java 17 for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test Firestore rules
+        run: npm run test:rules
+
+      - name: Build Next.js app
+        run: npm run build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ci-placeholder
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-placeholder.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci-placeholder
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ci-placeholder.firebasestorage.app
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ci-placeholder
+          NEXT_PUBLIC_FIREBASE_APP_ID: ci-placeholder
+
+  deploy:
+    name: Deploy Vercel and Firestore
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: quality
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Deploy Firestore rules and indexes
+        run: npx firebase-tools deploy --only firestore:rules,firestore:indexes --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
+
+      - name: Link Vercel project
+        run: npx vercel link --yes --project="${{ secrets.VERCEL_PROJECT_ID }}" --token="${{ secrets.VERCEL_TOKEN }}" --scope="${{ secrets.VERCEL_ORG_ID }}"
+
+      - name: Pull Vercel project settings
+        run: npx vercel pull --yes --environment=production --token="${{ secrets.VERCEL_TOKEN }}" --scope="${{ secrets.VERCEL_ORG_ID }}"
+
+      - name: Build Vercel artifact
+        run: npx vercel build --prod --token="${{ secrets.VERCEL_TOKEN }}" --scope="${{ secrets.VERCEL_ORG_ID }}"
+
+      - name: Deploy Vercel artifact
+        run: npx vercel deploy --prebuilt --prod --token="${{ secrets.VERCEL_TOKEN }}" --scope="${{ secrets.VERCEL_ORG_ID }}"

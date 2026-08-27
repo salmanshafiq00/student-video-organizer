@@ -7,10 +7,16 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useVideoLibrary } from "@/hooks/useVideoLibrary";
 import { FilterBar } from "@/components/filters/FilterBar";
 import { VideoGrid } from "@/components/video/VideoGrid";
+import { AddVideoDialog, type VideoDraft } from "@/components/video/AddVideoDialog";
 import { VideoCard } from "@/components/video/VideoCard";
 import { listCategories, listTags } from "@/lib/firestore/categoriesTags";
+import { addPersonalVideo, listPersonalPlaylists } from "@/lib/firestore/personalPlaylists";
 import { applyFilters, applySort } from "@/lib/filterSort";
-import type { Category, HomeFilters, SortOption, Tag } from "@/types";
+import { extractYouTubeId } from "@/lib/utils";
+import type { Category, HomeFilters, PersonalPlaylist, SortOption, Tag } from "@/types";
+import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function DashboardPage() {
   return (
@@ -22,7 +28,9 @@ export default function DashboardPage() {
 
 function DashboardContent() {
   const { user, profile } = useAuth();
-  const { loading, playlists, videos } = useVideoLibrary(user?.uid);
+  const { loading, error, playlists, videos, refresh } = useVideoLibrary(user?.uid);
+  const [personalPlaylists, setPersonalPlaylists] = React.useState<PersonalPlaylist[]>([]);
+  const [addOpen, setAddOpen] = React.useState(false);
   const [categories, setCategories] = React.useState<Category[]>([]);
   const [tags, setTags] = React.useState<Tag[]>([]);
   const [filters, setFilters] = React.useState<HomeFilters>({});
@@ -32,6 +40,26 @@ function DashboardContent() {
     listCategories().then(setCategories);
     listTags().then(setTags);
   }, []);
+
+  React.useEffect(() => {
+    if (user?.uid) listPersonalPlaylists(user.uid).then(setPersonalPlaylists);
+  }, [user?.uid]);
+
+  async function handleSaveVideo(draft: VideoDraft, playlistId: string) {
+    if (!user?.uid) return;
+    await addPersonalVideo(user.uid, playlistId, {
+      title: draft.title,
+      videoUrl: draft.videoUrl,
+      platform: draft.platform,
+      creatorName: draft.creatorName,
+      youtubeVideoId: draft.youtubeVideoId || extractYouTubeId(draft.videoUrl),
+      thumbnailUrl: draft.thumbnailUrl,
+    });
+    toast.success("Video saved to your playlist");
+    setPersonalPlaylists((current) => current.map((playlist) => playlist.id === playlistId
+      ? { ...playlist, videoCount: playlist.videoCount + 1 }
+      : playlist));
+  }
 
   const continueLearning = React.useMemo(
     () => videos.filter((v) => v.state?.status === "in_progress").sort((a, b) => (b.state?.watchedPercentage || 0) - (a.state?.watchedPercentage || 0)).slice(0, 4),
@@ -43,11 +71,14 @@ function DashboardContent() {
   return (
     <AppShell onSearch={(q) => setFilters((f) => ({ ...f, query: q }))}>
       <div className="mx-auto max-w-7xl space-y-6">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {greeting()}, {profile?.displayName?.split(" ")[0] || "there"}
-          </p>
-          <h1 className="font-display text-2xl font-semibold">What are you learning today?</h1>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              {greeting()}, {profile?.displayName?.split(" ")[0] || "there"}
+            </p>
+            <h1 className="font-display text-2xl font-semibold">What are you learning today?</h1>
+          </div>
+          <Button onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Save a video</Button>
         </div>
 
         {!loading && continueLearning.length > 0 && (
@@ -73,9 +104,17 @@ function DashboardContent() {
             onFiltersChange={setFilters}
             onSortChange={setSort}
           />
-          <VideoGrid videos={filtered} loading={loading} emptyTitle="No videos match your filters" emptyHint="Try clearing a filter or check back once an admin adds content." />
+          {error ? (
+            <div className="rounded-lg border border-dashed border-destructive/50 py-12 text-center">
+              <p className="text-sm text-destructive">{error}</p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>Try again</Button>
+            </div>
+          ) : (
+            <VideoGrid videos={filtered} loading={loading} emptyTitle="No videos match your filters" emptyHint="Try clearing a filter or check back once an admin adds content." />
+          )}
         </section>
       </div>
+      <AddVideoDialog open={addOpen} onOpenChange={setAddOpen} playlists={personalPlaylists} onSave={handleSaveVideo} />
     </AppShell>
   );
 }

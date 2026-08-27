@@ -91,15 +91,20 @@ export interface Playlist {
   updatedAt: Timestamp | null;
 }
 
+export type VideoPlatform = "youtube" | "facebook" | "vimeo" | "other";
+
 /** Shared video metadata, stored under playlists/{playlistId}/videos/{videoId}. */
 export interface Video {
   id: string;
   playlistId: string;
   title: string;
   videoUrl: string;
+  platform?: VideoPlatform;
   youtubeVideoId?: string | null;
   thumbnailUrl: string;
   durationSeconds?: number;
+  creatorName?: string;
+  publishedAt?: Timestamp | null;
   categoryId?: string | null;
   tagIds?: string[];
   description?: string;
@@ -187,9 +192,12 @@ export interface PersonalVideo {
   ownerId: string;
   title: string;
   videoUrl: string;
+  platform?: VideoPlatform;
   youtubeVideoId?: string | null;
   thumbnailUrl: string;
   durationSeconds?: number;
+  creatorName?: string;
+  publishedAt?: Timestamp | null;
   order: number;
   status: WatchStatus;
   watchedPercentage: number;

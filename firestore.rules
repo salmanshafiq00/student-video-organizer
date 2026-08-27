@@ -19,7 +19,8 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
     }
 
     function isActive() {
@@ -27,35 +28,216 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
     }
 
+    function hasValidUserProfile(data) {
+      return data.keys().hasOnly([
+          'email', 'displayName', 'role', 'status', 'createdAt', 'lastActiveAt', 'stats'
+        ]) &&
+        data.keys().hasAll(['email', 'displayName', 'role', 'status', 'createdAt', 'lastActiveAt']) &&
+        data.email is string && data.email.size() > 0 &&
+        data.displayName is string && data.displayName.size() > 0 &&
+        data.role in ['admin', 'student'] &&
+        data.status in ['active', 'disabled'] &&
+        data.createdAt is timestamp && data.lastActiveAt is timestamp;
+    }
+
+      function hasValidPlaylistFields(data) {
+        return data.keys().hasOnly([
+          'title', 'description', 'categoryId', 'tagIds', 'coverThumbnailUrl',
+          'visibility', 'videoCount', 'source', 'sourceUrl', 'createdBy',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasAll(['title', 'visibility', 'videoCount', 'source', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.title is string && data.title.size() > 0 &&
+        (!data.keys().hasAny(['description']) || data.description is string) &&
+        (!data.keys().hasAny(['categoryId']) || data.categoryId == null || data.categoryId is string) &&
+        (!data.keys().hasAny(['tagIds']) || data.tagIds is list) &&
+        (!data.keys().hasAny(['coverThumbnailUrl']) || data.coverThumbnailUrl is string) &&
+        data.visibility in ['shared', 'archived'] &&
+        data.videoCount is int && data.videoCount >= 0 &&
+        data.source in ['manual', 'youtube-import', 'json-import'] &&
+        (!data.keys().hasAny(['sourceUrl']) || data.sourceUrl == null || data.sourceUrl is string) &&
+        data.createdBy is string && data.createdBy.size() > 0 &&
+        data.createdAt is timestamp && data.updatedAt is timestamp;
+      }
+
+    function hasValidPersonalPlaylistFields(data) {
+      return data.keys().hasOnly(['title', 'description', 'videoCount', 'createdAt', 'updatedAt']) &&
+        data.keys().hasAll(['title', 'videoCount', 'createdAt', 'updatedAt']) &&
+        data.title is string && data.title.size() > 0 &&
+        (!data.keys().hasAny(['description']) || data.description is string) &&
+        data.videoCount is int && data.videoCount >= 0 &&
+        data.createdAt is timestamp && data.updatedAt is timestamp;
+    }
+
+    function isVideoPlatform(value) {
+      return value in ['youtube', 'facebook', 'vimeo', 'other'];
+    }
+
+    function hasValidVideoFields(data) {
+      return data.keys().hasOnly([
+          'title', 'videoUrl', 'platform', 'youtubeVideoId', 'thumbnailUrl',
+          'durationSeconds', 'creatorName', 'publishedAt', 'categoryId',
+          'tagIds', 'description', 'videoNo', 'lessonNo', 'partNo', 'pageNo',
+          'order', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasAll(['title', 'videoUrl', 'thumbnailUrl', 'order', 'createdAt', 'updatedAt']) &&
+        data.title is string && data.title.size() > 0 &&
+        data.videoUrl is string && data.videoUrl.matches('https://.*') &&
+        data.thumbnailUrl is string &&
+        data.order is int && data.order >= 0 &&
+        data.createdAt is timestamp && data.updatedAt is timestamp &&
+        (!data.keys().hasAny(['platform']) || isVideoPlatform(data.platform)) &&
+        (!data.keys().hasAny(['youtubeVideoId']) || data.youtubeVideoId == null || data.youtubeVideoId is string) &&
+        (!data.keys().hasAny(['durationSeconds']) || data.durationSeconds is number && data.durationSeconds >= 0) &&
+        (!data.keys().hasAny(['creatorName']) || data.creatorName is string) &&
+        (!data.keys().hasAny(['publishedAt']) || data.publishedAt == null || data.publishedAt is timestamp) &&
+        (!data.keys().hasAny(['categoryId']) || data.categoryId == null || data.categoryId is string) &&
+        (!data.keys().hasAny(['tagIds']) || data.tagIds is list) &&
+        (!data.keys().hasAny(['description']) || data.description is string) &&
+        (!data.keys().hasAny(['videoNo']) || data.videoNo == null || data.videoNo is int && data.videoNo >= 0) &&
+        (!data.keys().hasAny(['lessonNo']) || data.lessonNo == null || data.lessonNo is int && data.lessonNo >= 0) &&
+        (!data.keys().hasAny(['partNo']) || data.partNo == null || data.partNo is int && data.partNo >= 0) &&
+        (!data.keys().hasAny(['pageNo']) || data.pageNo == null || data.pageNo is int && data.pageNo >= 0);
+    }
+
+    function hasValidPersonalVideoFields(data) {
+      return data.keys().hasOnly([
+          'title', 'videoUrl', 'platform', 'youtubeVideoId', 'thumbnailUrl',
+          'durationSeconds', 'order', 'status', 'watchedPercentage',
+          'currentPositionSeconds', 'isFavorite', 'isWatchLater', 'priority',
+          'lastWatchedAt', 'completedAt', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasAll([
+          'title', 'videoUrl', 'thumbnailUrl', 'order', 'status',
+          'watchedPercentage', 'currentPositionSeconds', 'isFavorite',
+          'isWatchLater', 'priority', 'lastWatchedAt', 'completedAt',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.title is string && data.title.size() > 0 &&
+        data.videoUrl is string && data.videoUrl.matches('https://.*') &&
+        data.thumbnailUrl is string &&
+        data.order is int && data.order >= 0 &&
+        data.status in ['not_started', 'in_progress', 'completed'] &&
+        data.watchedPercentage is number && data.watchedPercentage >= 0 && data.watchedPercentage <= 100 &&
+        data.currentPositionSeconds is number && data.currentPositionSeconds >= 0 &&
+        data.isFavorite is bool && data.isWatchLater is bool &&
+        (data.priority == null || data.priority in ['high', 'medium', 'low']) &&
+        (data.lastWatchedAt == null || data.lastWatchedAt is timestamp) &&
+        (data.completedAt == null || data.completedAt is timestamp) &&
+        data.createdAt is timestamp && data.updatedAt is timestamp &&
+        (!data.keys().hasAny(['platform']) || isVideoPlatform(data.platform)) &&
+        (!data.keys().hasAny(['youtubeVideoId']) || data.youtubeVideoId == null || data.youtubeVideoId is string) &&
+        (!data.keys().hasAny(['durationSeconds']) || data.durationSeconds is number && data.durationSeconds >= 0);
+    }
+
+    function hasValidVideoStateFields(data) {
+      return data.keys().hasOnly([
+          'videoId', 'playlistId', 'status', 'watchedPercentage',
+          'currentPositionSeconds', 'isFavorite', 'isWatchLater', 'priority',
+          'watchLaterOrder', 'priorityOrder', 'lastWatchedAt', 'completedAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasAll([
+          'videoId', 'playlistId', 'status', 'watchedPercentage',
+          'currentPositionSeconds', 'isFavorite', 'isWatchLater', 'priority',
+          'lastWatchedAt', 'completedAt', 'updatedAt'
+        ]) &&
+        data.videoId is string && data.videoId.size() > 0 &&
+        data.playlistId is string && data.playlistId.size() > 0 &&
+        data.status in ['not_started', 'in_progress', 'completed'] &&
+        data.watchedPercentage is number && data.watchedPercentage >= 0 && data.watchedPercentage <= 100 &&
+        data.currentPositionSeconds is number && data.currentPositionSeconds >= 0 &&
+        data.isFavorite is bool && data.isWatchLater is bool &&
+        (data.priority == null || data.priority in ['high', 'medium', 'low']) &&
+        (!data.keys().hasAny(['watchLaterOrder']) || data.watchLaterOrder == null || data.watchLaterOrder is number && data.watchLaterOrder >= 0) &&
+        (!data.keys().hasAny(['priorityOrder']) || data.priorityOrder == null || data.priorityOrder is number && data.priorityOrder >= 0) &&
+        (data.lastWatchedAt == null || data.lastWatchedAt is timestamp) &&
+        (data.completedAt == null || data.completedAt is timestamp) &&
+        data.updatedAt is timestamp;
+    }
+
+    function hasValidNoteFields(data) {
+      return data.keys().hasOnly(['videoId', 'content', 'updatedAt']) &&
+        data.keys().hasAll(['videoId', 'content', 'updatedAt']) &&
+        data.videoId is string && data.videoId.size() > 0 &&
+        data.content is string && data.updatedAt is timestamp;
+    }
+
+    function hasValidBookmarkFields(data) {
+      return data.keys().hasOnly(['videoId', 'timestampSeconds', 'label', 'createdAt']) &&
+        data.keys().hasAll(['videoId', 'timestampSeconds', 'label', 'createdAt']) &&
+        data.videoId is string && data.videoId.size() > 0 &&
+        data.timestampSeconds is number && data.timestampSeconds >= 0 &&
+        data.label is string && data.createdAt is timestamp;
+    }
+
+    function hasValidGoalFields(data) {
+      return data.keys().hasOnly(['title', 'targetDate', 'completed', 'createdAt']) &&
+        data.keys().hasAll(['title', 'completed', 'createdAt']) &&
+        data.title is string && data.title.size() > 0 &&
+        (!data.keys().hasAny(['targetDate']) || data.targetDate == null || data.targetDate is string) &&
+        data.completed is bool && data.createdAt is timestamp;
+    }
+
+    function hasValidTaxonomyFields(data) {
+      return data.keys().hasOnly(['name', 'color', 'createdBy']) &&
+        data.keys().hasAll(['name', 'createdBy']) &&
+        data.name is string && data.name.size() > 0 &&
+        (!data.keys().hasAny(['color']) || data.color is string) &&
+        data.createdBy is string && data.createdBy.size() > 0;
+    }
+
     // ── Users & personal learning data ─────────────────────────────────
     match /users/{uid} {
       allow read: if isSelf(uid) || isAdmin();
       // Users may update their own profile EXCEPT role/status (privilege
       // escalation guard). Admins may update anything on any profile.
-      allow create: if isSelf(uid);
-      allow update: if isAdmin() ||
+      allow create: if isSelf(uid) &&
+        request.resource.data.role == 'student' &&
+        request.resource.data.status == 'active' &&
+        hasValidUserProfile(request.resource.data);
+      allow update: if (isAdmin() && hasValidUserProfile(request.resource.data)) ||
         (isSelf(uid) &&
           request.resource.data.role == resource.data.role &&
-          request.resource.data.status == resource.data.status);
+          request.resource.data.status == resource.data.status &&
+          hasValidUserProfile(request.resource.data));
       allow delete: if isAdmin();
 
       match /videoStates/{videoId} {
-        allow read, write: if isSelf(uid) || isAdmin();
+        allow read: if isSelf(uid) || isAdmin();
+        allow create: if (isSelf(uid) || isAdmin()) &&
+          request.resource.data.videoId == videoId &&
+          hasValidVideoStateFields(request.resource.data);
+        allow update: if (isSelf(uid) || isAdmin()) &&
+          request.resource.data.videoId == videoId &&
+          hasValidVideoStateFields(request.resource.data);
+        allow delete: if isSelf(uid) || isAdmin();
       }
       match /notes/{videoId} {
-        allow read, write: if isSelf(uid) || isAdmin();
+        allow read: if isSelf(uid) || isAdmin();
+        allow create, update: if (isSelf(uid) || isAdmin()) &&
+          request.resource.data.videoId == videoId && hasValidNoteFields(request.resource.data);
+        allow delete: if isSelf(uid) || isAdmin();
       }
       match /summaries/{videoId} {
-        allow read, write: if isSelf(uid) || isAdmin();
+        allow read: if isSelf(uid) || isAdmin();
+        allow create, update: if (isSelf(uid) || isAdmin()) &&
+          request.resource.data.videoId == videoId && hasValidNoteFields(request.resource.data);
+        allow delete: if isSelf(uid) || isAdmin();
       }
       match /bookmarks/{videoId}/items/{bookmarkId} {
-        allow read, write: if isSelf(uid) || isAdmin();
+        allow read: if isSelf(uid) || isAdmin();
+        allow create, update: if (isSelf(uid) || isAdmin()) &&
+          request.resource.data.videoId == videoId && hasValidBookmarkFields(request.resource.data);
+        allow delete: if isSelf(uid) || isAdmin();
       }
       match /favoritePlaylists/{playlistId} {
         allow read, write: if isSelf(uid) || isAdmin();
       }
       match /goals/{goalId} {
-        allow read, write: if isSelf(uid) || isAdmin();
+        allow read: if isSelf(uid) || isAdmin();
+        allow create, update: if (isSelf(uid) || isAdmin()) && hasValidGoalFields(request.resource.data);
+        allow delete: if isSelf(uid) || isAdmin();
       }
 
       // Personal playlists/videos the student creates themselves. Private
@@ -64,9 +246,15 @@ service cloud.firestore {
       // from the top-level /playlists collection (the shared library) to
       // avoid any confusion between the two content tiers.
       match /personalPlaylists/{playlistId} {
-        allow read, write: if isSelf(uid) || isAdmin();
+        allow read: if isSelf(uid) || isAdmin();
+        allow create: if (isSelf(uid) || isAdmin()) && hasValidPersonalPlaylistFields(request.resource.data);
+        allow update: if (isSelf(uid) || isAdmin()) && hasValidPersonalPlaylistFields(request.resource.data);
+        allow delete: if isSelf(uid) || isAdmin();
         match /videos/{videoId} {
-          allow read, write: if isSelf(uid) || isAdmin();
+          allow read: if isSelf(uid) || isAdmin();
+          allow create: if (isSelf(uid) || isAdmin()) && hasValidPersonalVideoFields(request.resource.data);
+          allow update: if (isSelf(uid) || isAdmin()) && hasValidPersonalVideoFields(request.resource.data);
+          allow delete: if isSelf(uid) || isAdmin();
         }
       }
     }
@@ -75,22 +263,28 @@ service cloud.firestore {
     // Readable by any signed-in, active user. Writable only by admins.
     match /playlists/{playlistId} {
       allow read: if isSignedIn() && isActive();
-      allow write: if isAdmin();
+      allow create: if isAdmin() && hasValidPlaylistFields(request.resource.data);
+      allow update: if isAdmin() && hasValidPlaylistFields(request.resource.data);
+      allow delete: if isAdmin();
 
       match /videos/{videoId} {
         allow read: if isSignedIn() && isActive();
-        allow write: if isAdmin();
+        allow create: if isAdmin() && hasValidVideoFields(request.resource.data);
+        allow update: if isAdmin() && hasValidVideoFields(request.resource.data);
+        allow delete: if isAdmin();
       }
     }
 
     match /categories/{categoryId} {
       allow read: if isSignedIn() && isActive();
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() && hasValidTaxonomyFields(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /tags/{tagId} {
       allow read: if isSignedIn() && isActive();
-      allow write: if isAdmin();
+      allow create, update: if isAdmin() && hasValidTaxonomyFields(request.resource.data);
+      allow delete: if isAdmin();
     }
   }
 }

@@ -55,7 +55,7 @@ export function VideoPlayer({ youtubeVideoId, videoUrl, startSeconds = 0, onProg
     }
 
     if (e.data === YT_ENDED) {
-      e.target.getDuration().then((dur) => onEnded(dur));
+      e.target.getDuration().then((dur: number) => onEnded(dur));
     }
   }
 

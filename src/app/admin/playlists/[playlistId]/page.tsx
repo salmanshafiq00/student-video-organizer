@@ -20,7 +20,7 @@ import { SortableList } from "@/components/dnd/SortableList";
 import {
   addVideo, getPlaylist, listVideos, removeVideo, reorderVideos, updateVideo,
 } from "@/lib/firestore/playlists";
-import { extractYouTubeId, formatDuration, youtubeThumbnail } from "@/lib/utils";
+import { detectVideoPlatform, extractYouTubeId, formatDuration, youtubeThumbnail } from "@/lib/utils";
 import type { Playlist, Video } from "@/types";
 import { ArrowLeft, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -71,6 +71,7 @@ function AdminPlaylistEditorContent() {
     await addVideo(playlistId, {
       title: newTitle.trim(),
       videoUrl: newUrl.trim(),
+      platform: detectVideoPlatform(newUrl),
       youtubeVideoId: ytId,
       thumbnailUrl: newThumb.trim() || (ytId ? youtubeThumbnail(ytId) : ""),
     } as any);
