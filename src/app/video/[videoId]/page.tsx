@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { getPlaylist, listVideos } from "@/lib/firestore/playlists";
-import { getUserVideoState, saveProgress, setPriority, setWatchedStatus, toggleFavorite, toggleWatchLater } from "@/lib/firestore/userVideoState";
+import { emptyState, getUserVideoState, saveProgress, setPriority, setWatchedStatus, toggleFavorite, toggleWatchLater } from "@/lib/firestore/userVideoState";
 import { getNote, getSummary, saveNote, saveSummary } from "@/lib/firestore/notes";
 import { addBookmark, listBookmarks, removeBookmark } from "@/lib/firestore/bookmarks";
 import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
@@ -105,9 +105,13 @@ function VideoPageContent() {
   async function handleToggleWatchLater() {
     if (!user || !video) return;
     const nextVal = !state?.isWatchLater;
-    await toggleWatchLater(user.uid, video.id, video.playlistId, nextVal);
-    setState((s) => ({ ...(s as UserVideoState), isWatchLater: nextVal }));
-    toast.success(nextVal ? "Added to Watch Later" : "Removed from Watch Later");
+    try {
+      await toggleWatchLater(user.uid, video.id, video.playlistId, nextVal);
+      setState((s) => ({ ...(s || { ...emptyState(video.id, video.playlistId) }), isWatchLater: nextVal }));
+      toast.success(nextVal ? "Added to Watch Later" : "Removed from Watch Later");
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Could not update Watch Later.");
+    }
   }
 
   async function handleSetPriority(p: PriorityLevel) {

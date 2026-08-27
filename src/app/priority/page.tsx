@@ -9,6 +9,7 @@ import { SortableList } from "@/components/dnd/SortableList";
 import { VideoListRow } from "@/components/video/VideoListRow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { setPriority, setWatchedStatus, reorderPersonalList } from "@/lib/firestore/userVideoState";
+import { reorderPersonalVideoState, setPersonalVideoPriority, setPersonalVideoWatched } from "@/lib/firestore/personalPlaylists";
 import type { VideoWithState } from "@/types";
 import { toast } from "sonner";
 
@@ -44,17 +45,35 @@ function PriorityContent() {
 
   async function handleReorder(level: string, newOrder: VideoWithState[]) {
     setGroups((g) => ({ ...g, [level]: newOrder }));
-    await reorderPersonalList(user!.uid, newOrder.map((v) => v.id), "priorityOrder");
+    const sharedIds = newOrder.filter((v) => !v.isPersonal).map((v) => v.id);
+    if (sharedIds.length > 0) {
+      await reorderPersonalList(user!.uid, sharedIds, "priorityOrder");
+    }
+    const personalByPlaylist = new Map<string, string[]>();
+    newOrder.filter((v) => v.isPersonal).forEach((v) => {
+      const ids = personalByPlaylist.get(v.playlistId) || [];
+      ids.push(v.id);
+      personalByPlaylist.set(v.playlistId, ids);
+    });
+    await Promise.all([...personalByPlaylist].map(([playlistId, ids]) => reorderPersonalVideoState(user!.uid, playlistId, ids, "priorityOrder")));
   }
 
   async function handleChangeLevel(v: VideoWithState, p: "high" | "medium" | "low" | null) {
-    await setPriority(user!.uid, v.id, v.playlistId, p);
+    if (v.isPersonal) {
+      await setPersonalVideoPriority(user!.uid, v.playlistId, v.id, p);
+    } else {
+      await setPriority(user!.uid, v.id, v.playlistId, p);
+    }
     toast.success(p ? `Moved to ${p} priority` : "Priority removed");
     refresh();
   }
 
   async function handleMarkWatched(v: VideoWithState) {
-    await setWatchedStatus(user!.uid, v.id, v.playlistId, v.state?.status !== "completed");
+    if (v.isPersonal) {
+      await setPersonalVideoWatched(user!.uid, v.playlistId, v.id, v.state?.status !== "completed");
+    } else {
+      await setWatchedStatus(user!.uid, v.id, v.playlistId, v.state?.status !== "completed");
+    }
     refresh();
   }
 

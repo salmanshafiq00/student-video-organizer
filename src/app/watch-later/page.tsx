@@ -8,9 +8,11 @@ import { useVideoLibrary } from "@/hooks/useVideoLibrary";
 import { SortableList } from "@/components/dnd/SortableList";
 import { VideoListRow } from "@/components/video/VideoListRow";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import {
   toggleWatchLater, setWatchedStatus, setPriority, reorderPersonalList,
 } from "@/lib/firestore/userVideoState";
+import { reorderPersonalVideoState, setPersonalVideoWatched, togglePersonalVideoWatchLater } from "@/lib/firestore/personalPlaylists";
 import type { VideoWithState } from "@/types";
 import { toast } from "sonner";
 
@@ -24,7 +26,7 @@ export default function WatchLaterPage() {
 
 function WatchLaterContent() {
   const { user } = useAuth();
-  const { loading, videos, refresh } = useVideoLibrary(user?.uid);
+  const { loading, error, videos, refresh } = useVideoLibrary(user?.uid);
   const [order, setOrder] = React.useState<VideoWithState[]>([]);
 
   React.useEffect(() => {
@@ -38,20 +40,40 @@ function WatchLaterContent() {
 
   async function handleReorder(newOrder: VideoWithState[]) {
     setOrder(newOrder);
-    await reorderPersonalList(user!.uid, newOrder.map((v) => v.id), "watchLaterOrder");
+    const sharedIds = newOrder.filter((v) => !v.isPersonal).map((v) => v.id);
+    if (sharedIds.length > 0) await reorderPersonalList(user!.uid, sharedIds, "watchLaterOrder");
+    const personalByPlaylist = new Map<string, string[]>();
+    newOrder.filter((v) => v.isPersonal).forEach((v) => {
+      const ids = personalByPlaylist.get(v.playlistId) || [];
+      ids.push(v.id);
+      personalByPlaylist.set(v.playlistId, ids);
+    });
+    await Promise.all([...personalByPlaylist].map(([playlistId, ids]) => reorderPersonalVideoState(user!.uid, playlistId, ids, "watchLaterOrder")));
   }
 
   async function handleRemove(v: VideoWithState) {
-    await toggleWatchLater(user!.uid, v.id, v.playlistId, false);
-    toast.success("Removed from Watch Later");
-    refresh();
+    try {
+      if (v.isPersonal) {
+        await togglePersonalVideoWatchLater(user!.uid, v.playlistId, v.id, false);
+      } else {
+        await toggleWatchLater(user!.uid, v.id, v.playlistId, false);
+      }
+      toast.success("Removed from Watch Later");
+      await refresh();
+    } catch (cause) {
+      toast.error(cause instanceof Error ? cause.message : "Could not update Watch Later.");
+    }
   }
 
   async function handleMarkWatched(v: VideoWithState) {
     const next = v.state?.status !== "completed";
-    await setWatchedStatus(user!.uid, v.id, v.playlistId, next);
+    if (v.isPersonal) {
+      await setPersonalVideoWatched(user!.uid, v.playlistId, v.id, next);
+    } else {
+      await setWatchedStatus(user!.uid, v.id, v.playlistId, next);
+    }
     toast.success(next ? "Marked watched" : "Marked unwatched");
-    refresh();
+    await refresh();
   }
 
   async function handlePriority(v: VideoWithState, p: "high" | "medium" | "low" | null) {
@@ -70,6 +92,11 @@ function WatchLaterContent() {
         {loading ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[68px] w-full rounded-lg" />)}
+          </div>
+        ) : error ? (
+          <div className="rounded-lg border border-dashed border-destructive/50 py-12 text-center">
+            <p className="text-sm text-destructive">{error}</p>
+            <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>Try again</Button>
           </div>
         ) : order.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border py-12 text-center text-sm text-muted-foreground">

@@ -4,6 +4,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { PersonalPlaylist, PersonalVideo, PriorityLevel, VideoPlatform, WatchStatus } from "@/types";
+import { deletePersonalShare, syncPersonalPlaylistShare } from "@/lib/firestore/sharing";
 
 /**
  * Personal playlists live under users/{ownerId}/personalPlaylists/{id} —
@@ -37,14 +38,18 @@ export async function renamePersonalPlaylist(ownerId: string, playlistId: string
   await updateDoc(doc(db, "users", ownerId, "personalPlaylists", playlistId), {
     title, ...(description !== undefined ? { description } : {}), updatedAt: serverTimestamp(),
   });
+  await syncPersonalPlaylistShare(ownerId, playlistId);
 }
 
 export async function deletePersonalPlaylist(ownerId: string, playlistId: string) {
+  const playlist = await getDoc(doc(db, "users", ownerId, "personalPlaylists", playlistId));
   const vids = await getDocs(videosCol(ownerId, playlistId));
   const batch = writeBatch(db);
   vids.docs.forEach((d) => batch.delete(d.ref));
   batch.delete(doc(db, "users", ownerId, "personalPlaylists", playlistId));
   await batch.commit();
+  const token = playlist.exists() ? (playlist.data() as PersonalPlaylist).shareToken : undefined;
+  if (token) await deletePersonalShare(token);
 }
 
 export async function listPersonalVideos(ownerId: string, playlistId: string): Promise<PersonalVideo[]> {
@@ -92,6 +97,7 @@ export async function addPersonalVideo(
     videoCount: increment(1), updatedAt: serverTimestamp(),
   });
   await batch.commit();
+  await syncPersonalPlaylistShare(ownerId, playlistId);
   return ref.id;
 }
 
@@ -102,6 +108,7 @@ export async function updatePersonalVideoMeta(
   await updateDoc(doc(db, "users", ownerId, "personalPlaylists", playlistId, "videos", videoId), {
     ...data, updatedAt: serverTimestamp(),
   });
+  await syncPersonalPlaylistShare(ownerId, playlistId);
 }
 
 export async function removePersonalVideo(ownerId: string, playlistId: string, videoId: string) {
@@ -111,6 +118,7 @@ export async function removePersonalVideo(ownerId: string, playlistId: string, v
     videoCount: increment(-1), updatedAt: serverTimestamp(),
   });
   await batch.commit();
+  await syncPersonalPlaylistShare(ownerId, playlistId);
 }
 
 export async function reorderPersonalVideos(ownerId: string, playlistId: string, orderedVideoIds: string[]) {
@@ -118,6 +126,23 @@ export async function reorderPersonalVideos(ownerId: string, playlistId: string,
   orderedVideoIds.forEach((videoId, index) => {
     batch.update(doc(db, "users", ownerId, "personalPlaylists", playlistId, "videos", videoId), {
       order: index, updatedAt: serverTimestamp(),
+    });
+  });
+  await batch.commit();
+  await syncPersonalPlaylistShare(ownerId, playlistId);
+}
+
+export async function reorderPersonalVideoState(
+  ownerId: string,
+  playlistId: string,
+  orderedVideoIds: string[],
+  field: "watchLaterOrder" | "priorityOrder"
+) {
+  const batch = writeBatch(db);
+  orderedVideoIds.forEach((videoId, index) => {
+    batch.update(doc(db, "users", ownerId, "personalPlaylists", playlistId, "videos", videoId), {
+      [field]: index,
+      updatedAt: serverTimestamp(),
     });
   });
   await batch.commit();

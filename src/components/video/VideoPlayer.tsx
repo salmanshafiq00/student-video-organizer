@@ -46,12 +46,14 @@ export function VideoPlayer({ youtubeVideoId, videoUrl, startSeconds = 0, onProg
       intervalRef.current = setInterval(async () => {
         const cur = await e.target.getCurrentTime();
         const dur = await e.target.getDuration();
-        onProgress(cur, dur);
+        if (dur > 0) onProgress(cur, dur);
       }, 20000);
     }
 
     if (e.data === YT_PAUSED) {
-      Promise.all([e.target.getCurrentTime(), e.target.getDuration()]).then(([cur, dur]) => onPause(cur, dur));
+      Promise.all([e.target.getCurrentTime(), e.target.getDuration()]).then(([cur, dur]) => {
+        if (dur > 0) onPause(cur, dur);
+      });
     }
 
     if (e.data === YT_ENDED) {
@@ -64,7 +66,9 @@ export function VideoPlayer({ youtubeVideoId, videoUrl, startSeconds = 0, onProg
     function handleBeforeUnload() {
       const p = playerRef.current;
       if (!p) return;
-      Promise.all([p.getCurrentTime(), p.getDuration()]).then(([cur, dur]) => onProgress(cur, dur));
+      Promise.all([p.getCurrentTime(), p.getDuration()]).then(([cur, dur]) => {
+        if (dur > 0) onProgress(cur, dur);
+      });
     }
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {

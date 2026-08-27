@@ -4,8 +4,15 @@ import type { VideoWithState } from "@/types";
 import { Inbox } from "lucide-react";
 
 export function VideoGrid({
-  videos, loading, emptyTitle = "Nothing here yet", emptyHint = "Try adjusting your filters.",
-}: { videos: VideoWithState[]; loading?: boolean; emptyTitle?: string; emptyHint?: string }) {
+  videos, loading, emptyTitle = "Nothing here yet", emptyHint = "Try adjusting your filters.", onToggleFavorite, onToggleWatched,
+}: {
+  videos: VideoWithState[];
+  loading?: boolean;
+  emptyTitle?: string;
+  emptyHint?: string;
+  onToggleFavorite?: (video: VideoWithState) => void;
+  onToggleWatched?: (video: VideoWithState) => void;
+}) {
   if (loading) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -32,7 +39,7 @@ export function VideoGrid({
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {videos.map((v) => <VideoCard key={v.id} video={v} />)}
+      {videos.map((v) => <VideoCard key={v.id} video={v} onToggleFavorite={() => onToggleFavorite?.(v)} onToggleWatched={() => onToggleWatched?.(v)} />)}
     </div>
   );
 }

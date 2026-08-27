@@ -26,6 +26,8 @@ import { detectVideoPlatform, extractYouTubeId, formatDuration, youtubeThumbnail
 import type { PersonalPlaylist, PersonalVideo } from "@/types";
 import { ArrowLeft, GripVertical, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ShareDialog } from "@/components/sharing/ShareDialog";
+import { preparePersonalPlaylistShare, updatePersonalPlaylistVisibility } from "@/lib/firestore/sharing";
 
 export default function PersonalPlaylistEditorPage() {
   return (
@@ -47,6 +49,7 @@ function PersonalPlaylistEditorContent() {
   const [loading, setLoading] = React.useState(true);
   const [addOpen, setAddOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<PersonalVideo | null>(null);
+  const [share, setShare] = React.useState<{ token: string; visibility: "private" | "unlisted" | "public" } | null>(null);
 
   const [newUrl, setNewUrl] = React.useState("");
   const [newTitle, setNewTitle] = React.useState("");
@@ -118,6 +121,11 @@ function PersonalPlaylistEditorContent() {
     window.location.href = isViewingOther ? `/my-playlists?owner=${ownerId}` : "/my-playlists";
   }
 
+  async function handleShare() {
+    const prepared = await preparePersonalPlaylistShare(ownerId, playlistId);
+    setShare(prepared);
+  }
+
   const backHref = isViewingOther ? `/my-playlists?owner=${ownerId}` : "/my-playlists";
 
   return (
@@ -138,6 +146,7 @@ function PersonalPlaylistEditorContent() {
               <p className="text-sm text-muted-foreground">{videos.length} videos · private{isViewingOther ? " to this student" : ""}</p>
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleShare}>Share</Button>
               <Button variant="outline" size="sm" onClick={handleDeletePlaylist}><Trash2 className="h-4 w-4" /> Delete Playlist</Button>
               <Button size="sm" onClick={() => setAddOpen(true)}><Plus className="h-4 w-4" /> Add Video</Button>
             </div>
@@ -176,6 +185,20 @@ function PersonalPlaylistEditorContent() {
           />
         )}
       </div>
+
+      {share && (
+        <ShareDialog
+          open
+          onOpenChange={(open) => !open && setShare(null)}
+          title="Share Playlist"
+          shareUrl={`${window.location.origin}/share/${share.token}`}
+          visibility={share.visibility}
+          onVisibilityChange={async (visibility) => {
+            const token = await updatePersonalPlaylistVisibility(ownerId, playlistId, visibility);
+            setShare({ token, visibility });
+          }}
+        />
+      )}
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>

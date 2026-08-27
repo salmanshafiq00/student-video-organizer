@@ -6,6 +6,8 @@ import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useVideoLibrary } from "@/hooks/useVideoLibrary";
 import { VideoGrid } from "@/components/video/VideoGrid";
+import { setWatchedStatus, toggleFavorite } from "@/lib/firestore/userVideoState";
+import { setPersonalVideoWatched, togglePersonalVideoFavorite } from "@/lib/firestore/personalPlaylists";
 
 export default function ContinueLearningPage() {
   return (
@@ -17,10 +19,30 @@ export default function ContinueLearningPage() {
 
 function ContinueLearningContent() {
   const { user } = useAuth();
-  const { loading, videos } = useVideoLibrary(user?.uid);
+  const { loading, videos, refresh } = useVideoLibrary(user?.uid);
+
+  async function handleToggleFavorite(video: (typeof videos)[number]) {
+    if (!user) return;
+    if (video.isPersonal) {
+      await togglePersonalVideoFavorite(user.uid, video.playlistId, video.id, !video.state?.isFavorite);
+    } else {
+      await toggleFavorite(user.uid, video.id, video.playlistId, !video.state?.isFavorite);
+    }
+    refresh();
+  }
+
+  async function handleToggleWatched(video: (typeof videos)[number]) {
+    if (!user) return;
+    if (video.isPersonal) {
+      await setPersonalVideoWatched(user.uid, video.playlistId, video.id, video.state?.status !== "completed");
+    } else {
+      await setWatchedStatus(user.uid, video.id, video.playlistId, video.state?.status !== "completed");
+    }
+    refresh();
+  }
 
   const inProgress = videos
-    .filter((v) => v.state?.status === "in_progress")
+    .filter((v) => v.state?.status === "in_progress" || (v.state?.watchedPercentage || 0) > 0)
     .sort((a, b) => tsMillis(b.state?.lastWatchedAt) - tsMillis(a.state?.lastWatchedAt));
 
   // "Next in active playlists": the first not-started video that comes right
@@ -57,20 +79,20 @@ function ContinueLearningContent() {
 
         <section className="space-y-3">
           <h2 className="font-display text-lg font-semibold">In Progress</h2>
-          <VideoGrid videos={inProgress} loading={loading} emptyTitle="Nothing in progress" emptyHint="Start a video from the library to see it here." />
+          <VideoGrid videos={inProgress} loading={loading} onToggleFavorite={handleToggleFavorite} onToggleWatched={handleToggleWatched} emptyTitle="Nothing in progress" emptyHint="Start a video from the library to see it here." />
         </section>
 
         {nextUp.length > 0 && (
           <section className="space-y-3">
             <h2 className="font-display text-lg font-semibold">Next Up</h2>
-            <VideoGrid videos={nextUp} loading={loading} />
+            <VideoGrid videos={nextUp} loading={loading} onToggleFavorite={handleToggleFavorite} onToggleWatched={handleToggleWatched} />
           </section>
         )}
 
         {recentlyWatched.length > 0 && (
           <section className="space-y-3">
             <h2 className="font-display text-lg font-semibold">Recently Completed</h2>
-            <VideoGrid videos={recentlyWatched} loading={loading} />
+            <VideoGrid videos={recentlyWatched} loading={loading} onToggleFavorite={handleToggleFavorite} onToggleWatched={handleToggleWatched} />
           </section>
         )}
       </div>

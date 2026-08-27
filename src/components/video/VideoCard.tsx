@@ -2,8 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Star, Clock, CheckCircle2, GripVertical } from "lucide-react";
+import {
+  Check, CheckCircle2, Clock, ExternalLink, GripVertical, MoreVertical,
+  Share2, Star,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { cn, formatDuration } from "@/lib/utils";
 import type { VideoWithState } from "@/types";
@@ -15,27 +23,45 @@ const priorityDot: Record<string, string> = {
 };
 
 export function VideoCard({
-  video, dragHandleProps, className,
-}: { video: VideoWithState; dragHandleProps?: any; className?: string }) {
+  video, dragHandleProps, className, onToggleFavorite, onToggleWatched, onShare,
+}: {
+  video: VideoWithState;
+  dragHandleProps?: any;
+  className?: string;
+  onToggleFavorite?: () => void;
+  onToggleWatched?: () => void;
+  onShare?: () => void;
+}) {
   const pct = video.state?.watchedPercentage || 0;
   const completed = video.state?.status === "completed";
+  const platformLabel = video.platform === "youtube" ? "YouTube" : video.platform === "facebook" ? "Facebook" : video.platform === "vimeo" ? "Vimeo" : "Other";
+  const watchLabel = video.platform === "youtube" ? "Watch on YouTube" : `Watch on ${platformLabel}`;
+
+  async function shareVideo() {
+    if (onShare) return onShare();
+    if (navigator.share) {
+      await navigator.share({ title: video.title, url: video.videoUrl });
+    } else {
+      await navigator.clipboard.writeText(video.videoUrl);
+    }
+  }
 
   return (
-    <Link
-      href={`/video/${video.id}?playlist=${video.playlistId}`}
+    <article
       className={cn(
         "group flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-shadow hover:shadow-md",
         className
       )}
     >
-      <div className="relative aspect-video w-full overflow-hidden bg-secondary">
-        <Image
-          src={video.thumbnailUrl}
-          alt={video.title}
-          fill
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-          className="object-cover transition-transform duration-300 group-hover:scale-105"
-        />
+      <Link href={video.isPersonal ? `/my-playlists/${video.playlistId}/${video.id}` : `/video/${video.id}?playlist=${video.playlistId}`} className="block">
+        <div className="relative aspect-video w-full overflow-hidden bg-secondary">
+          {video.thumbnailUrl && <Image
+            src={video.thumbnailUrl}
+            alt={video.title}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
+          />}
         {dragHandleProps && (
           <div
             {...dragHandleProps}
@@ -70,11 +96,19 @@ export function VideoCard({
             <Progress value={pct} className="h-1 rounded-none bg-black/30" />
           </div>
         )}
-      </div>
+        </div>
+      </Link>
 
       <div className="flex flex-1 flex-col gap-1.5 p-3">
-        <h3 className="line-clamp-2 text-sm font-medium leading-snug">{video.title}</h3>
-        <p className="truncate text-xs text-muted-foreground">{video.playlistTitle}</p>
+        <Link href={video.isPersonal ? `/my-playlists/${video.playlistId}/${video.id}` : `/video/${video.id}?playlist=${video.playlistId}`} className="min-w-0 hover:underline">
+          <h3 className="line-clamp-2 text-sm font-medium leading-snug">{video.title}</h3>
+        </Link>
+        <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <Badge variant="outline" className="shrink-0">{platformLabel}</Badge>
+          {video.creatorName && <span className="truncate">{video.creatorName}</span>}
+          {video.durationSeconds ? <span className="shrink-0">· {formatDuration(video.durationSeconds)}</span> : null}
+        </div>
+        {video.playlistTitle && <p className="truncate text-xs text-muted-foreground">{video.playlistTitle}</p>}
         <div className="mt-auto flex items-center gap-1.5 pt-1">
           {completed && <Badge variant="success">Completed</Badge>}
           {!completed && pct > 0 && <Badge variant="secondary">{pct}% watched</Badge>}
@@ -84,7 +118,47 @@ export function VideoCard({
             </Badge>
           )}
         </div>
+        <div className="mt-1 flex items-center gap-1 border-t border-border pt-2">
+          <Button asChild size="sm" className="min-w-0 flex-1">
+            <a href={video.videoUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="h-3.5 w-3.5" /> <span className="truncate">{watchLabel}</span>
+            </a>
+          </Button>
+          <Button
+            variant={video.state?.isFavorite ? "accent" : "ghost"}
+            size="icon"
+            onClick={onToggleFavorite}
+            disabled={!onToggleFavorite}
+            aria-label={video.state?.isFavorite ? "Remove favorite" : "Add favorite"}
+            title={video.state?.isFavorite ? "Remove favorite" : "Favorite"}
+          >
+            <Star className={video.state?.isFavorite ? "fill-current" : ""} />
+          </Button>
+          <Button
+            variant={completed ? "accent" : "ghost"}
+            size="icon"
+            onClick={onToggleWatched}
+            disabled={!onToggleWatched}
+            aria-label={completed ? "Mark unwatched" : "Mark watched"}
+            title={completed ? "Mark unwatched" : "Watched"}
+          >
+            {completed ? <Check /> : <CheckCircle2 />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={shareVideo} aria-label="Share video" title="Share">
+            <Share2 />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label="More video actions" title="More"><MoreVertical /></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild><a href={video.videoUrl} target="_blank" rel="noopener noreferrer"><ExternalLink /> Open original video</a></DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={shareVideo}><Share2 /> Copy or share link</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-    </Link>
+    </article>
   );
 }

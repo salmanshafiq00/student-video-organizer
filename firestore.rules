@@ -61,11 +61,13 @@ service cloud.firestore {
       }
 
     function hasValidPersonalPlaylistFields(data) {
-      return data.keys().hasOnly(['title', 'description', 'videoCount', 'createdAt', 'updatedAt']) &&
+      return data.keys().hasOnly(['title', 'description', 'videoCount', 'visibility', 'shareToken', 'createdAt', 'updatedAt']) &&
         data.keys().hasAll(['title', 'videoCount', 'createdAt', 'updatedAt']) &&
         data.title is string && data.title.size() > 0 &&
         (!data.keys().hasAny(['description']) || data.description is string) &&
         data.videoCount is int && data.videoCount >= 0 &&
+        (!data.keys().hasAny(['visibility']) || data.visibility in ['private', 'unlisted', 'public']) &&
+        (!data.keys().hasAny(['shareToken']) || data.shareToken is string && data.shareToken.size() >= 32) &&
         data.createdAt is timestamp && data.updatedAt is timestamp;
     }
 
@@ -103,7 +105,7 @@ service cloud.firestore {
     function hasValidPersonalVideoFields(data) {
       return data.keys().hasOnly([
           'title', 'videoUrl', 'platform', 'youtubeVideoId', 'thumbnailUrl',
-          'durationSeconds', 'order', 'status', 'watchedPercentage',
+          'durationSeconds', 'creatorName', 'visibility', 'shareToken', 'order', 'status', 'watchedPercentage',
           'currentPositionSeconds', 'isFavorite', 'isWatchLater', 'priority',
           'lastWatchedAt', 'completedAt', 'createdAt', 'updatedAt'
         ]) &&
@@ -127,7 +129,34 @@ service cloud.firestore {
         data.createdAt is timestamp && data.updatedAt is timestamp &&
         (!data.keys().hasAny(['platform']) || isVideoPlatform(data.platform)) &&
         (!data.keys().hasAny(['youtubeVideoId']) || data.youtubeVideoId == null || data.youtubeVideoId is string) &&
-        (!data.keys().hasAny(['durationSeconds']) || data.durationSeconds is number && data.durationSeconds >= 0);
+          (!data.keys().hasAny(['durationSeconds']) || data.durationSeconds is number && data.durationSeconds >= 0) &&
+          (!data.keys().hasAny(['creatorName']) || data.creatorName is string) &&
+          (!data.keys().hasAny(['visibility']) || data.visibility in ['private', 'unlisted', 'public']) &&
+          (!data.keys().hasAny(['shareToken']) || data.shareToken is string && data.shareToken.size() >= 32);
+      }
+
+      function hasValidPublicShareFields(data) {
+        return data.keys().hasOnly([
+            'token', 'resourceType', 'visibility', 'title', 'ownerId', 'resourceId',
+            'playlistId', 'videoUrl', 'thumbnailUrl', 'platform', 'creatorName',
+            'durationSeconds', 'description', 'videos', 'updatedAt'
+          ]) &&
+          data.keys().hasAll(['token', 'resourceType', 'visibility', 'title', 'ownerId', 'resourceId', 'updatedAt']) &&
+          data.token is string && data.token.size() >= 32 &&
+          data.resourceType in ['video', 'playlist'] &&
+          data.visibility in ['private', 'unlisted', 'public'] &&
+          data.title is string && data.title.size() > 0 &&
+          data.ownerId is string && data.ownerId.size() > 0 &&
+          data.resourceId is string && data.resourceId.size() > 0 &&
+          (!data.keys().hasAny(['videoUrl']) || data.videoUrl is string) &&
+          (!data.keys().hasAny(['thumbnailUrl']) || data.thumbnailUrl is string) &&
+          (!data.keys().hasAny(['platform']) || isVideoPlatform(data.platform)) &&
+          (!data.keys().hasAny(['creatorName']) || data.creatorName is string) &&
+          (!data.keys().hasAny(['durationSeconds']) || data.durationSeconds is number && data.durationSeconds >= 0) &&
+          (!data.keys().hasAny(['description']) || data.description is string) &&
+          (!data.keys().hasAny(['videos']) || data.videos is list) &&
+          data.updatedAt is timestamp;
+      }
     }
 
     function hasValidVideoStateFields(data) {
@@ -285,6 +314,14 @@ service cloud.firestore {
       allow read: if isSignedIn() && isActive();
       allow create, update: if isAdmin() && hasValidTaxonomyFields(request.resource.data);
       allow delete: if isAdmin();
+    }
+
+    match /publicShares/{token} {
+      allow read: if resource.data.visibility in ['unlisted', 'public'];
+      allow create, update: if isAdmin() ||
+        (isSignedIn() && request.resource.data.ownerId == request.auth.uid && hasValidPublicShareFields(request.resource.data));
+      allow delete: if isAdmin() ||
+        (isSignedIn() && resource.data.ownerId == request.auth.uid);
     }
   }
 }

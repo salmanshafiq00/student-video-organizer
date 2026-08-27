@@ -10,6 +10,7 @@ import { VideoActionsBar } from "@/components/video/VideoActionsBar";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Lock } from "lucide-react";
@@ -22,6 +23,8 @@ import { useDebouncedCallback } from "@/hooks/useDebouncedCallback";
 import { formatDuration } from "@/lib/utils";
 import type { PersonalVideo, PriorityLevel } from "@/types";
 import { toast } from "sonner";
+import { ShareDialog } from "@/components/sharing/ShareDialog";
+import { preparePersonalVideoShare, updatePersonalVideoVisibility } from "@/lib/firestore/sharing";
 
 // Personal videos reuse the notes/summaries collections but namespace the
 // doc id with a "p_" prefix so they can never collide with a shared-library
@@ -49,6 +52,7 @@ function PersonalVideoContent() {
   const [note, setNote] = React.useState("");
   const [summary, setSummary] = React.useState("");
   const [loading, setLoading] = React.useState(true);
+  const [share, setShare] = React.useState<{ token: string; visibility: "private" | "unlisted" | "public" } | null>(null);
 
   const load = React.useCallback(async () => {
     if (!ownerId) return;
@@ -121,6 +125,11 @@ function PersonalVideoContent() {
     setVideo((v) => (v ? { ...v, status: nextVal ? "completed" : "not_started", watchedPercentage: nextVal ? 100 : 0 } : v));
   }
 
+  async function handleShare() {
+    const prepared = await preparePersonalVideoShare(ownerId, playlistId, videoId);
+    setShare(prepared);
+  }
+
   if (loading || !video) {
     return (
       <AppShell>
@@ -171,6 +180,8 @@ function PersonalVideoContent() {
           onToggleWatched={handleToggleWatched}
         />
 
+        <div><Button variant="outline" size="sm" onClick={handleShare}>Share</Button></div>
+
         <Tabs defaultValue="summary">
           <TabsList>
             <TabsTrigger value="summary">Summary</TabsTrigger>
@@ -194,6 +205,19 @@ function PersonalVideoContent() {
           </TabsContent>
         </Tabs>
       </div>
+      {share && (
+        <ShareDialog
+          open
+          onOpenChange={(open) => !open && setShare(null)}
+          title="Share Video"
+          shareUrl={`${window.location.origin}/share/${share.token}`}
+          visibility={share.visibility}
+          onVisibilityChange={async (visibility) => {
+            const token = await updatePersonalVideoVisibility(ownerId, playlistId, videoId, visibility);
+            setShare({ token, visibility });
+          }}
+        />
+      )}
     </AppShell>
   );
 }

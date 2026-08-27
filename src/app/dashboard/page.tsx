@@ -11,6 +11,8 @@ import { AddVideoDialog, type VideoDraft } from "@/components/video/AddVideoDial
 import { VideoCard } from "@/components/video/VideoCard";
 import { listCategories, listTags } from "@/lib/firestore/categoriesTags";
 import { addPersonalVideo, listPersonalPlaylists } from "@/lib/firestore/personalPlaylists";
+import { setWatchedStatus, toggleFavorite } from "@/lib/firestore/userVideoState";
+import { setPersonalVideoWatched, togglePersonalVideoFavorite } from "@/lib/firestore/personalPlaylists";
 import { applyFilters, applySort } from "@/lib/filterSort";
 import { extractYouTubeId } from "@/lib/utils";
 import type { Category, HomeFilters, PersonalPlaylist, SortOption, Tag } from "@/types";
@@ -61,6 +63,26 @@ function DashboardContent() {
       : playlist));
   }
 
+  async function handleToggleFavorite(video: (typeof videos)[number]) {
+    if (!user) return;
+    if (video.isPersonal) {
+      await togglePersonalVideoFavorite(user.uid, video.playlistId, video.id, !video.state?.isFavorite);
+    } else {
+      await toggleFavorite(user.uid, video.id, video.playlistId, !video.state?.isFavorite);
+    }
+    refresh();
+  }
+
+  async function handleToggleWatched(video: (typeof videos)[number]) {
+    if (!user) return;
+    if (video.isPersonal) {
+      await setPersonalVideoWatched(user.uid, video.playlistId, video.id, video.state?.status !== "completed");
+    } else {
+      await setWatchedStatus(user.uid, video.id, video.playlistId, video.state?.status !== "completed");
+    }
+    refresh();
+  }
+
   const continueLearning = React.useMemo(
     () => videos.filter((v) => v.state?.status === "in_progress").sort((a, b) => (b.state?.watchedPercentage || 0) - (a.state?.watchedPercentage || 0)).slice(0, 4),
     [videos]
@@ -85,7 +107,7 @@ function DashboardContent() {
           <section>
             <h2 className="mb-3 font-display text-lg font-semibold">Continue Learning</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {continueLearning.map((v) => <VideoCard key={v.id} video={v} />)}
+              {continueLearning.map((v) => <VideoCard key={v.id} video={v} onToggleFavorite={() => handleToggleFavorite(v)} onToggleWatched={() => handleToggleWatched(v)} />)}
             </div>
           </section>
         )}
@@ -110,7 +132,7 @@ function DashboardContent() {
               <Button variant="outline" size="sm" className="mt-3" onClick={refresh}>Try again</Button>
             </div>
           ) : (
-            <VideoGrid videos={filtered} loading={loading} emptyTitle="No videos match your filters" emptyHint="Try clearing a filter or check back once an admin adds content." />
+            <VideoGrid videos={filtered} loading={loading} onToggleFavorite={handleToggleFavorite} onToggleWatched={handleToggleWatched} emptyTitle="No videos match your filters" emptyHint="Try clearing a filter or check back once an admin adds content." />
           )}
         </section>
       </div>

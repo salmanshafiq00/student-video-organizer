@@ -182,6 +182,8 @@ export interface PersonalPlaylist {
   title: string;
   description?: string;
   videoCount: number;
+  visibility?: ShareVisibility;
+  shareToken?: string;
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
 }
@@ -198,6 +200,8 @@ export interface PersonalVideo {
   durationSeconds?: number;
   creatorName?: string;
   publishedAt?: Timestamp | null;
+  visibility?: ShareVisibility;
+  shareToken?: string;
   order: number;
   status: WatchStatus;
   watchedPercentage: number;
@@ -205,9 +209,42 @@ export interface PersonalVideo {
   isFavorite: boolean;
   isWatchLater: boolean;
   priority: PriorityLevel;
+  watchLaterOrder?: number;
+  priorityOrder?: number;
   lastWatchedAt: Timestamp | null;
   completedAt: Timestamp | null;
   createdAt: Timestamp | null;
+  updatedAt: Timestamp | null;
+}
+
+export type ShareVisibility = "private" | "unlisted" | "public";
+
+export interface PublicSharedVideo {
+  id: string;
+  title: string;
+  videoUrl: string;
+  thumbnailUrl: string;
+  platform?: VideoPlatform;
+  creatorName?: string;
+  durationSeconds?: number;
+  order: number;
+}
+
+export interface PublicShare {
+  token: string;
+  resourceType: "video" | "playlist";
+  visibility: ShareVisibility;
+  title: string;
+  ownerId: string;
+  resourceId: string;
+  playlistId?: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  platform?: VideoPlatform;
+  creatorName?: string;
+  durationSeconds?: number;
+  description?: string;
+  videos?: PublicSharedVideo[];
   updatedAt: Timestamp | null;
 }
 
@@ -224,6 +261,8 @@ export interface Goal {
 export interface VideoWithState extends Video {
   state: UserVideoState | null;
   playlistTitle?: string;
+  isPersonal?: boolean;
+  ownerId?: string;
 }
 
 export interface HomeFilters {

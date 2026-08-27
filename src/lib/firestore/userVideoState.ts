@@ -58,6 +58,7 @@ export async function saveProgress(
   currentPositionSeconds: number,
   watchedPercentage: number
 ) {
+  if (!Number.isFinite(currentPositionSeconds) || !Number.isFinite(watchedPercentage) || watchedPercentage < 0) return;
   const safePercentage = Math.min(100, Math.max(0, Math.round(watchedPercentage)));
   const status: WatchStatus = safePercentage >= 95 ? "completed" : safePercentage > 0 ? "in_progress" : "not_started";
   const patch: Partial<UserVideoState> = {

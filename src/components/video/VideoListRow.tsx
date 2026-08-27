@@ -28,10 +28,10 @@ export function VideoListRow({
           <GripVertical className="h-4 w-4" />
         </span>
       )}
-      <Link href={`/video/${video.id}?playlist=${video.playlistId}`} className="relative h-14 w-24 shrink-0 overflow-hidden rounded-md bg-secondary">
+      <Link href={video.isPersonal ? `/my-playlists/${video.playlistId}/${video.id}` : `/video/${video.id}?playlist=${video.playlistId}`} className="relative h-14 w-24 shrink-0 overflow-hidden rounded-md bg-secondary">
         <Image src={video.thumbnailUrl} alt={video.title} fill className="object-cover" sizes="96px" />
       </Link>
-      <Link href={`/video/${video.id}?playlist=${video.playlistId}`} className="min-w-0 flex-1">
+      <Link href={video.isPersonal ? `/my-playlists/${video.playlistId}/${video.id}` : `/video/${video.id}?playlist=${video.playlistId}`} className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{video.title}</p>
         <p className="truncate text-xs text-muted-foreground">{video.playlistTitle} · {formatDuration(video.durationSeconds)}</p>
       </Link>
