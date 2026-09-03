@@ -13,9 +13,10 @@ import { listPersonalPlaylists } from "@/lib/firestore/personalPlaylists";
 import { isResumeEligible } from "@/lib/watchProgress";
 import { formatWatchTime } from "@/lib/utils";
 import { VideoCard } from "@/components/video/VideoCard";
+import { QuickAddVideoDialog } from "@/components/video/QuickAddVideoDialog";
 import { toggleFavoriteAny, toggleWatchLaterAny, setPriorityAny, setWatchedAny } from "@/lib/videoActions";
 import type { PersonalPlaylist, PriorityLevel, VideoWithState } from "@/types";
-import { Clock3, FolderPlus, ListVideo, Plus, Star, Flag, Download, BookOpen, PlayCircle, CheckCircle2 } from "lucide-react";
+import { Clock3, ListVideo, Plus, Star, Flag, BookOpen, PlayCircle, CheckCircle2 } from "lucide-react";
 
 export default function DashboardPage() {
   return (
@@ -29,6 +30,7 @@ function DashboardContent() {
   const { user, profile } = useAuth();
   const { loading, videos, refresh } = useAllVideos(user?.uid);
   const [playlists, setPlaylists] = React.useState<PersonalPlaylist[]>([]);
+  const [saveVideoOpen, setSaveVideoOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!user?.uid) return;
@@ -78,8 +80,6 @@ function DashboardContent() {
     refresh();
   }
 
-  const firstPlaylistHref = playlists[0] ? `/my-playlists/${playlists[0].id}?add=1` : "/my-playlists";
-
   return (
     <AppShell>
       <div className="mx-auto max-w-7xl space-y-8">
@@ -90,9 +90,7 @@ function DashboardContent() {
               <h1 className="font-display text-3xl font-semibold">What are you learning today?</h1>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm"><Link href={firstPlaylistHref}><Plus className="h-4 w-4" /> Add Video</Link></Button>
-              <Button asChild variant="outline" size="sm"><Link href="/my-playlists"><FolderPlus className="h-4 w-4" /> Create Playlist</Link></Button>
-              <Button asChild variant="outline" size="sm"><Link href="/my-playlists/import"><Download className="h-4 w-4" /> Import Playlist</Link></Button>
+              <Button size="sm" onClick={() => setSaveVideoOpen(true)}><Plus className="h-4 w-4" /> Save Video</Button>
             </div>
           </div>
 
@@ -201,6 +199,13 @@ function DashboardContent() {
           )}
         </section>
       </div>
+      {user?.uid && <QuickAddVideoDialog
+        ownerId={user.uid}
+        playlists={playlists}
+        open={saveVideoOpen}
+        onOpenChange={setSaveVideoOpen}
+        onSaved={() => listPersonalPlaylists(user.uid).then(setPlaylists).catch(() => {})}
+      />}
     </AppShell>
   );
 }

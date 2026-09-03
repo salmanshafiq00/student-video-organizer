@@ -262,6 +262,7 @@ export interface PersonalPlaylist {
   ownerId: string;
   title: string;
   description?: string;
+  isUnsorted?: boolean;
   visibility: PersonalPlaylistVisibility;
   sortMode?: PersonalPlaylistSortMode;
   sortOrder?: string[];

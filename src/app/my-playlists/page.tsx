@@ -22,6 +22,7 @@ import type { PersonalPlaylist, PersonalPlaylistVisibility } from "@/types";
 import { Lock, Plus, ListVideo, Youtube } from "lucide-react";
 import { formatWatchTime } from "@/lib/utils";
 import { toast } from "sonner";
+import { QuickAddVideoDialog } from "@/components/video/QuickAddVideoDialog";
 
 const PERSONAL_PLAYLIST_VISIBILITY_LABELS: Record<PersonalPlaylistVisibility, string> = {
   private: "Private",
@@ -51,6 +52,7 @@ function MyPlaylistsContent() {
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [visibility, setVisibility] = React.useState<PersonalPlaylistVisibility>("private");
+  const [saveVideoOpen, setSaveVideoOpen] = React.useState(false);
 
   const load = React.useCallback(async () => {
     if (!ownerId) return;
@@ -60,6 +62,9 @@ function MyPlaylistsContent() {
   }, [ownerId]);
 
   React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => {
+    if (searchParams.get("add") === "1") setSaveVideoOpen(true);
+  }, [searchParams]);
 
   async function handleCreate() {
     if (!ownerId || !title.trim()) return;
@@ -86,6 +91,7 @@ function MyPlaylistsContent() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {!isViewingOther && <Button variant="outline" size="sm" onClick={() => setSaveVideoOpen(true)}><Plus className="h-4 w-4" /> Save Video</Button>}
             <Button asChild variant="outline" size="sm"><Link href="/my-playlists/import"><Youtube className="h-4 w-4" /> Import Playlist</Link></Button>
             <Button size="sm" onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4" /> New Playlist</Button>
           </div>
@@ -101,13 +107,13 @@ function MyPlaylistsContent() {
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {playlists.map((p) => (
+            {[...playlists].sort((a, b) => Number(!!b.isUnsorted) - Number(!!a.isUnsorted)).map((p) => (
               <Link key={p.id} href={`/my-playlists/${p.id}${isViewingOther ? `?owner=${ownerId}` : ""}`}>
                 <Card className="h-full transition-shadow hover:shadow-md">
                   <CardContent className="space-y-2 p-4">
                     <div className="flex items-center gap-2">
                       <ListVideo className="h-4 w-4 text-muted-foreground" />
-                      <p className="truncate font-medium">{p.title}</p>
+                      <p className="truncate font-medium">{p.isUnsorted ? `Unsorted (${p.videoCount || 0})` : p.title}</p>
                     </div>
                     {p.description && <p className="line-clamp-2 text-sm text-muted-foreground">{p.description}</p>}
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -122,6 +128,14 @@ function MyPlaylistsContent() {
           </div>
         )}
       </div>
+
+      {!isViewingOther && <QuickAddVideoDialog
+        ownerId={ownerId}
+        playlists={playlists}
+        open={saveVideoOpen}
+        onOpenChange={setSaveVideoOpen}
+        onSaved={load}
+      />}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

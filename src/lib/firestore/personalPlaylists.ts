@@ -1,6 +1,6 @@
 import {
   addDoc, collection, deleteDoc, doc, getDoc, getDocs, increment,
-  orderBy, query, serverTimestamp, updateDoc, writeBatch,
+  orderBy, query, serverTimestamp, updateDoc, where, writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { PersonalPlaylist, PersonalPlaylistSortMode, PersonalPlaylistVisibility, PersonalVideo, PriorityLevel, WatchStatus } from "@/types";
@@ -24,6 +24,32 @@ export async function listPersonalPlaylists(ownerId: string): Promise<PersonalPl
 export async function getPersonalPlaylist(ownerId: string, playlistId: string): Promise<PersonalPlaylist | null> {
   const snap = await getDoc(doc(db, "users", ownerId, "personalPlaylists", playlistId));
   return snap.exists() ? ({ id: snap.id, ownerId, ...snap.data() } as PersonalPlaylist) : null;
+}
+
+export async function getOrCreateUnsortedPlaylist(ownerId: string): Promise<PersonalPlaylist> {
+  const existing = await getDocs(query(playlistsCol(ownerId), where("isUnsorted", "==", true)));
+  if (!existing.empty) {
+    const playlist = existing.docs[0];
+    return { id: playlist.id, ownerId, ...playlist.data() } as PersonalPlaylist;
+  }
+
+  const ref = await addDoc(playlistsCol(ownerId), {
+    title: "Unsorted",
+    description: "Videos saved without a playlist.",
+    isUnsorted: true,
+    visibility: "private" as PersonalPlaylistVisibility,
+    sortMode: "custom" as PersonalPlaylistSortMode,
+    sortOrder: [],
+    videoCount: 0,
+    totalDurationSeconds: 0,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return {
+    id: ref.id, ownerId, title: "Unsorted", description: "Videos saved without a playlist.",
+    isUnsorted: true, visibility: "private", sortMode: "custom", sortOrder: [],
+    videoCount: 0, totalDurationSeconds: 0, createdAt: null, updatedAt: null,
+  };
 }
 
 export async function createPersonalPlaylist(
@@ -260,6 +286,43 @@ export async function addPersonalVideo(
     updatedAt: serverTimestamp(),
   });
   return ref.id;
+}
+
+export async function addStandaloneVideo(
+  ownerId: string,
+  videoData: Parameters<typeof addPersonalVideo>[2],
+): Promise<string> {
+  const unsorted = await getOrCreateUnsortedPlaylist(ownerId);
+  return addPersonalVideo(ownerId, unsorted.id, videoData);
+}
+
+export async function movePersonalVideoToPlaylist(
+  ownerId: string,
+  sourcePlaylistId: string,
+  targetPlaylistId: string,
+  videoId: string,
+): Promise<boolean> {
+  if (sourcePlaylistId === targetPlaylistId) return false;
+  const sourceVideoRef = doc(db, "users", ownerId, "personalPlaylists", sourcePlaylistId, "videos", videoId);
+  const sourceVideo = await getDoc(sourceVideoRef);
+  if (!sourceVideo.exists()) return false;
+  const video = sourceVideo.data();
+  if (await findDuplicatePersonalVideoUrl(ownerId, targetPlaylistId, video.videoUrl)) return false;
+
+  const targetVideos = await getDocs(videosCol(ownerId, targetPlaylistId));
+  const targetPlaylistRef = doc(db, "users", ownerId, "personalPlaylists", targetPlaylistId);
+  const sourcePlaylistRef = doc(db, "users", ownerId, "personalPlaylists", sourcePlaylistId);
+  const [targetPlaylist, sourcePlaylist] = await Promise.all([getDoc(targetPlaylistRef), getDoc(sourcePlaylistRef)]);
+  const targetOrder = (targetPlaylist.data()?.sortOrder as string[] | undefined) || [];
+  const sourceOrder = ((sourcePlaylist.data()?.sortOrder as string[] | undefined) || []).filter((id) => id !== videoId);
+  const targetVideoRef = doc(videosCol(ownerId, targetPlaylistId));
+  const batch = writeBatch(db);
+  batch.set(targetVideoRef, { ...video, playlistId: targetPlaylistId, order: targetVideos.size, updatedAt: serverTimestamp() });
+  batch.delete(sourceVideoRef);
+  batch.update(targetPlaylistRef, { sortOrder: [...targetOrder, targetVideoRef.id], videoCount: increment(1), totalDurationSeconds: increment(video.durationSeconds || 0), updatedAt: serverTimestamp() });
+  batch.update(sourcePlaylistRef, { sortOrder: sourceOrder, videoCount: increment(-1), totalDurationSeconds: increment(-(video.durationSeconds || 0)), updatedAt: serverTimestamp() });
+  await batch.commit();
+  return true;
 }
 
 export async function findDuplicatePersonalVideoUrl(ownerId: string, playlistId: string, candidateUrl: string): Promise<boolean> {

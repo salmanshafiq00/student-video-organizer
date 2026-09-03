@@ -24,6 +24,7 @@ import {
   addPersonalVideo, bulkRemovePersonalVideos, bulkSetPersonalVideosWatched, bulkSetPersonalVideoPriority,
   bulkTogglePersonalVideoFavorite, bulkTogglePersonalVideoWatchLater, bulkSetPersonalVideoDurations, deletePersonalPlaylist,
   findDuplicatePersonalVideoUrl, getPersonalPlaylist, listPersonalVideos, movePersonalVideo,
+  listPersonalPlaylists, movePersonalVideoToPlaylist,
   removePersonalVideo, reorderPersonalVideos, renamePersonalPlaylist, setPersonalPlaylistSortMode,
   setPersonalPlaylistAutoPlay, setPersonalPlaylistSortKeywords, setPersonalVideoPriority, setPersonalVideoWatched,
   syncPersonalPlaylistTotalDuration, togglePersonalVideoFavorite, togglePersonalVideoWatchLater, updatePersonalVideoMeta,
@@ -108,6 +109,9 @@ function PersonalPlaylistEditorContent() {
   const [searchQuery, setSearchQuery] = React.useState("");
   const [filterMode, setFilterMode] = React.useState<"all" | "watched" | "unwatched" | "favorites" | "priority">("all");
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const [personalPlaylists, setPersonalPlaylists] = React.useState<PersonalPlaylist[]>([]);
+  const [moveVideo, setMoveVideo] = React.useState<PersonalVideo | null>(null);
+  const [moveTarget, setMoveTarget] = React.useState("");
 
   const [newUrl, setNewUrl] = React.useState("");
   const [newTitle, setNewTitle] = React.useState("");
@@ -121,12 +125,14 @@ function PersonalPlaylistEditorContent() {
   const load = React.useCallback(async () => {
     if (!ownerId) return;
     setLoading(true);
-    const [p, vids] = await Promise.all([
+    const [p, vids, allPlaylists] = await Promise.all([
       getPersonalPlaylist(ownerId, playlistId),
       listPersonalVideos(ownerId, playlistId),
+      listPersonalPlaylists(ownerId),
     ]);
     setPlaylist(p);
     setVideos(vids);
+    setPersonalPlaylists(allPlaylists);
     setLoading(false);
   }, [ownerId, playlistId]);
 
@@ -613,6 +619,18 @@ function PersonalPlaylistEditorContent() {
     load();
   }
 
+  async function handleMoveToPlaylist() {
+    if (!moveVideo || !moveTarget) return;
+    const moved = await movePersonalVideoToPlaylist(ownerId, playlistId, moveTarget, moveVideo.id);
+    if (!moved) {
+      toast.error("That video is already in the selected playlist, or could not be moved.");
+      return;
+    }
+    setMoveVideo(null); setMoveTarget("");
+    toast.success("Video added to playlist");
+    load();
+  }
+
   async function handleDeletePlaylist() {
     if (!confirm(`Delete "${playlist?.title}" and all its videos? This can't be undone.`)) return;
     await deletePersonalPlaylist(ownerId, playlistId);
@@ -912,11 +930,26 @@ function PersonalPlaylistEditorContent() {
                 onToggleWatchLater={() => handleRowToggleWatchLater(v)}
                 onSetPriority={(p) => handleRowSetPriority(v, p)}
                 onToggleWatched={() => handleRowToggleWatched(v)}
+                onAddToPlaylist={playlist?.isUnsorted ? () => setMoveVideo(v) : undefined}
               />
             )}
           />
         )}
       </div>
+
+      <Dialog open={!!moveVideo} onOpenChange={(open) => { if (!open) { setMoveVideo(null); setMoveTarget(""); } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Add to Playlist</DialogTitle></DialogHeader>
+          <p className="text-sm text-muted-foreground">Choose where to move “{moveVideo?.title}”.</p>
+          <Select value={moveTarget} onValueChange={setMoveTarget}>
+            <SelectTrigger><SelectValue placeholder="Select a playlist" /></SelectTrigger>
+            <SelectContent>
+              {personalPlaylists.filter((p) => p.id !== playlistId && !p.isUnsorted).map((p) => <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <DialogFooter><Button variant="outline" onClick={() => setMoveVideo(null)}>Cancel</Button><Button onClick={handleMoveToPlaylist} disabled={!moveTarget}>Move video</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addOpen} onOpenChange={(open) => {
         setAddOpen(open);

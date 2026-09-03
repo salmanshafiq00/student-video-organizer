@@ -223,7 +223,7 @@ function VideoPageContent() {
             </a>
           </Button>
 
-          {playlistVideos.length > 1 && (
+          {playlistVideos.length > 0 && (
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setPlaylistVisible((v) => !v)}>
               {playlistVisible ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
               {playlistVisible ? "Hide playlist" : "Show playlist"}

@@ -26,6 +26,7 @@ export function PlaylistVideoRow({
   video, watchHref, selected, dragHandleProps, canDrag, isSorting,
   canMoveUp, canMoveDown, onToggleSelect, onMoveUp, onMoveDown,
   onEdit, onRemove, onToggleFavorite, onToggleWatchLater, onSetPriority, onToggleWatched,
+  onAddToPlaylist,
 }: {
   video: PersonalVideo;
   watchHref: string;
@@ -44,6 +45,7 @@ export function PlaylistVideoRow({
   onToggleWatchLater: () => void;
   onSetPriority: (p: PriorityLevel) => void;
   onToggleWatched: () => void;
+  onAddToPlaylist?: () => void;
 }) {
   const { lesson, part, page } = parseLessonPartPage(video.title);
   const lessonLabel = [
@@ -173,6 +175,7 @@ export function PlaylistVideoRow({
           <DropdownMenuItem onClick={onMoveDown} disabled={!canMoveDown || isSorting}><ChevronDown className="h-3.5 w-3.5" /> Move down</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onEdit}><Pencil className="h-3.5 w-3.5" /> Edit</DropdownMenuItem>
+          {onAddToPlaylist && <DropdownMenuItem onClick={onAddToPlaylist}>Add to Playlist</DropdownMenuItem>}
           <DropdownMenuItem onClick={onRemove} className="text-destructive focus:text-destructive"><Trash2 className="h-3.5 w-3.5" /> Remove</DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
