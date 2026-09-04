@@ -9,6 +9,7 @@ import { SortableList } from "@/components/dnd/SortableList";
 import { VideoListRow } from "@/components/video/VideoListRow";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toggleWatchLaterAny, setWatchedAny, setPriorityAny, reorderMixedList } from "@/lib/videoActions";
+import { groupVideosByPlaylist, type PlaylistGroup } from "@/lib/groupByPlaylist";
 import type { VideoWithState } from "@/types";
 import { toast } from "sonner";
 
@@ -23,19 +24,25 @@ export default function WatchLaterPage() {
 function WatchLaterContent() {
   const { user } = useAuth();
   const { loading, videos, refresh } = useAllVideos(user?.uid);
-  const [order, setOrder] = React.useState<VideoWithState[]>([]);
+  const [groups, setGroups] = React.useState<PlaylistGroup<VideoWithState>[]>([]);
 
   React.useEffect(() => {
     const list = videos
       .filter((v) => v.state?.isWatchLater)
       .sort((a, b) => (a.state?.watchLaterOrder || 0) - (b.state?.watchLaterOrder || 0));
-    setOrder(list);
+    setGroups(groupVideosByPlaylist(list));
   }, [videos]);
 
   if (!user) return null;
 
-  async function handleReorder(newOrder: VideoWithState[]) {
-    setOrder(newOrder);
+  const totalCount = groups.reduce((sum, g) => sum + g.videos.length, 0);
+
+  // Reordering is scoped to a single playlist group: the drag only ever
+  // reorders within the group it started in (SortableList instances are
+  // independent per group), and the write only touches the videos in that
+  // group's own array — a video's playlist membership never changes here.
+  async function handleReorder(playlistId: string | null, newOrder: VideoWithState[]) {
+    setGroups((gs) => gs.map((g) => (g.playlistId === playlistId ? { ...g, videos: newOrder } : g)));
     await reorderMixedList(user!.uid, newOrder, "watchLaterOrder");
   }
 
@@ -59,36 +66,44 @@ function WatchLaterContent() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="mx-auto max-w-3xl space-y-6">
         <div>
           <h1 className="font-display text-2xl font-semibold">Watch Later</h1>
-          <p className="text-sm text-muted-foreground">Videos you&apos;ve saved to come back to. Drag to reorder.</p>
+          <p className="text-sm text-muted-foreground">Videos you&apos;ve saved to come back to, grouped by playlist. Drag to reorder within a group.</p>
         </div>
 
         {loading ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[68px] w-full rounded-lg" />)}
           </div>
-        ) : order.length === 0 ? (
+        ) : totalCount === 0 ? (
           <p className="rounded-lg border border-dashed border-border py-12 text-center text-sm text-muted-foreground">
             Nothing saved yet — tap &quot;Watch Later&quot; on any video to add it here.
           </p>
         ) : (
-          <SortableList
-            items={order}
-            getId={(v) => v.id}
-            onReorder={handleReorder}
-            className="space-y-2"
-            renderItem={(v, dragHandleProps) => (
-              <VideoListRow
-                video={v}
-                dragHandleProps={dragHandleProps}
-                onMarkWatched={() => handleMarkWatched(v)}
-                onRemove={() => handleRemove(v)}
-                onSetPriority={(p) => handlePriority(v, p)}
+          groups.map((group) => (
+            <section key={group.playlistId ?? "other"} className="space-y-2">
+              <h2 className="font-display text-base font-semibold">
+                {group.playlistTitle}{" "}
+                <span className="text-sm font-normal text-muted-foreground">({group.videos.length})</span>
+              </h2>
+              <SortableList
+                items={group.videos}
+                getId={(v) => v.id}
+                onReorder={(newOrder) => handleReorder(group.playlistId, newOrder)}
+                className="space-y-2"
+                renderItem={(v, dragHandleProps) => (
+                  <VideoListRow
+                    video={v}
+                    dragHandleProps={dragHandleProps}
+                    onMarkWatched={() => handleMarkWatched(v)}
+                    onRemove={() => handleRemove(v)}
+                    onSetPriority={(p) => handlePriority(v, p)}
+                  />
+                )}
               />
-            )}
-          />
+            </section>
+          ))
         )}
       </div>
     </AppShell>

@@ -12,6 +12,7 @@ import { Progress } from "@/components/ui/progress";
 import { isResumeEligible } from "@/lib/watchProgress";
 import { getVideoWatchHref } from "@/lib/videoRoutes";
 import { formatDuration } from "@/lib/utils";
+import { groupVideosByPlaylist } from "@/lib/groupByPlaylist";
 import type { VideoWithState } from "@/types";
 
 export default function ContinueLearningPage() {
@@ -35,12 +36,18 @@ function ContinueLearningContent() {
     [videos]
   );
 
+  // Grouped by playlist for readability, but each group keeps the same
+  // most-recently-watched-first ordering the flat list used before —
+  // there's no manual reorder here (no drag-and-drop), just a computed
+  // resume queue split into sections.
+  const groups = React.useMemo(() => groupVideosByPlaylist(continueWatching), [continueWatching]);
+
   return (
     <AppShell>
-      <div className="mx-auto max-w-7xl space-y-6">
+      <div className="mx-auto max-w-7xl space-y-8">
         <div>
           <h1 className="font-display text-2xl font-semibold">Continue Watching</h1>
-          <p className="text-sm text-muted-foreground">Resume videos with real progress and pick up from where you left off.</p>
+          <p className="text-sm text-muted-foreground">Resume videos with real progress, grouped by playlist, most recently watched first.</p>
         </div>
 
         {!loading && continueWatching.length === 0 && (
@@ -49,13 +56,19 @@ function ContinueLearningContent() {
           </div>
         )}
 
-        {continueWatching.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {continueWatching.map((video, index) => (
-              <ContinueWatchingCard key={video.id} video={video} priority={index === 0} />
-            ))}
-          </div>
-        )}
+        {groups.map((group, groupIndex) => (
+          <section key={group.playlistId ?? "other"} className="space-y-3">
+            <h2 className="font-display text-lg font-semibold">
+              {group.playlistTitle}{" "}
+              <span className="text-sm font-normal text-muted-foreground">({group.videos.length})</span>
+            </h2>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {group.videos.map((video, index) => (
+                <ContinueWatchingCard key={video.id} video={video} priority={groupIndex === 0 && index === 0} />
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
     </AppShell>
   );
